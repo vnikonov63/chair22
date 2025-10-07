@@ -2,6 +2,7 @@ use std::env;
 use std::mem;
 use std::fs::File;
 use std::io::prelude::*;
+use std::collections::HashMap;
 
 use sexp::*;
 use sexp::Atom::*;
@@ -30,6 +31,7 @@ enum Expr {
 fn parse_expr(s: &Sexp) -> Expr {
     match s {
         Sexp::Atom(I(n))                                                       => Expr::Number(i32::try_from(*n).unwrap()),
+        Sexp::Atom(S(s))                                                       => Expr::Id(s.clone()),
         Sexp::List(vec) => {
             match &vec[..] {
                 [Sexp::Atom(S(op)), e] if op == "add1"                         => Expr::UnOp(Op1::Add1, Box::new(parse_expr(e))),
@@ -60,10 +62,12 @@ fn parse_expr(s: &Sexp) -> Expr {
     }
 }
 
-fn compile_expr(e: &Expr, si: i32) -> String {
+
+// TODO ask a question about this mutable/immutable map because I honestly do not understand.
+fn compile_expr(e: &Expr, si: i32, env: &mut HashMap<String, i32>) -> String {
     match e {
         Expr::Number(n)         => format!("mov rax, {}", *n),
-        Expr::Id(s)             => format!("string"),
+        Expr::Id(s)             => format!("mov rax, {}", ),
         Expr::Let(v, e)         => format!("let"),
         Expr::UnOp(op, e)       => {
             let instr = compile_expr(e, si);
@@ -117,8 +121,10 @@ fn main() -> std::io::Result<()> {
     let mut in_contents = String::new();
     in_file.read_to_string(&mut in_contents)?;
 
+    let mut env = HashMap::new();
+
     let expr = parse_expr(&parse(&in_contents).unwrap());
-    let result = compile_expr(&expr, 2);
+    let result = compile_expr(&expr, 2, env);
     let asm_program = format!("
 section .text
 global our_code_starts_here
