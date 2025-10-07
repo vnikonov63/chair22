@@ -62,8 +62,8 @@ fn compile_expr(e: &Expr, si: i32) -> String {
             let stack_offset = si * 8;
             match op {
                 Op2::Plus       => format!("{e1_instr}\nmov [rsp - {stack_offset}], rax \n{e2_instr}\nadd rax, [rsp - {stack_offset}]"),
-                Op2::Minus      => format!("minus"),
-                Op2::Times      => format!("times"),
+                Op2::Minus      => format!("{e2_instr}\nmov [rsp - {stack_offset}], rax \n{e1_instr}\nsub rax, [rsp - {stack_offset}]"),
+                Op2::Times      => format!("{e1_instr}\nmov [rsp - {stack_offset}], rax \n{e2_instr}\nimul rax, [rsp - {stack_offset}]"),
             }
         }
     }
