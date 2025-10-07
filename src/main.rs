@@ -104,7 +104,7 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
             }
             result_instr.push_str("\n");
             // TODO: The + 1 increase is guaranteed by the last iteratin in the loop, right?
-            let b_instr = compile_expr(body, curr_si, curr_env);
+            let b_instr = compile_expr(body, curr_si + 1, curr_env);
 
             result_instr.push_str(&b_instr);
 
