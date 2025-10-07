@@ -29,18 +29,34 @@ enum Expr {
 
 fn parse_expr(s: &Sexp) -> Expr {
     match s {
-        Sexp::Atom(I(n))                                      => Expr::Number(i32::try_from(*n).unwrap()),
+        Sexp::Atom(I(n))                                                       => Expr::Number(i32::try_from(*n).unwrap()),
         Sexp::List(vec) => {
             match &vec[..] {
-                [Sexp::Atom(S(op)), e] if op == "add1"        => Expr::UnOp(Op1::Add1, Box::new(parse_expr(e))),
-                [Sexp::Atom(S(op)), e] if op == "sub1"        => Expr::UnOp(Op1::Sub1, Box::new(parse_expr(e))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "+"      => Expr::BinOp(Op2::Plus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "-"      => Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "*"      => Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                _ => panic!("parse error"),
+                [Sexp::Atom(S(op)), e] if op == "add1"                         => Expr::UnOp(Op1::Add1, Box::new(parse_expr(e))),
+                [Sexp::Atom(S(op)), e] if op == "sub1"                         => Expr::UnOp(Op1::Sub1, Box::new(parse_expr(e))),
+                
+                [Sexp::Atom(S(op)), e1, e2] if op == "+"                       => Expr::BinOp(Op2::Plus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
+                [Sexp::Atom(S(op)), e1, e2] if op == "-"                       => Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
+                [Sexp::Atom(S(op)), e1, e2] if op == "*"                       => Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
+
+                [Sexp::Atom(S(op)), Sexp::List(bindings), body] if op == "let" => {
+                    let mut bs = Vec::new();
+                    for b in bindings {
+                        match b {
+                            Sexp::List(vec![Sexp::Atom(S(name)), e])           => {
+                                let pair = (name.clone(), parse_expr(e));
+                                bs.push(pair);
+                            }
+                            _                                                  => panic!("Invalid")
+                        }
+                    }
+
+                    Expr::Let(bs, Box::new(parse_expr(body)))
+                }
+                _                                                              => panic!("Invalid"),
             }
         },
-        _ => panic!("parse error"),
+        _                                                                      => panic!("Invalid"),
     }
 }
 
