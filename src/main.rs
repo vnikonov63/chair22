@@ -150,8 +150,8 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
 
 
 fn main() -> std::io::Result<()> {
-    let mut ops = dynasmrt::x64::Assembler::new().unwrap();
-    let start = ops.offset();
+    /* let mut ops = dynasmrt::x64::Assembler::new().unwrap();
+    let start = ops.offset(); */
 
     let args: Vec<String> = env::args().collect();
 
