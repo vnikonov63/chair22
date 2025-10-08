@@ -14,5 +14,8 @@
 *.tmp
 *.swp
 
+# ---- My Simple Stuff
 .cargo/
 test/
+tests/*.s
+tests/*.run
