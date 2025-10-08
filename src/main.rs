@@ -215,7 +215,7 @@ fn main() -> std::io::Result<()> {
                 eprintln!("Usage: cargo run [CARGO_FLAGS] -- -c <input.snek> <output.s>");
             }
             let env = HashMap::new();
-            let result = compile_expr(&expr, 2, env);
+            let result = compile_expr(&expr, 2, env.clone());
             let asm_program = format!("
 section .text
 global our_code_starts_here
@@ -232,7 +232,7 @@ our_code_starts_here:
             let start = ops.offset();
 
             let env = HashMap::new();
-            compile_ops(&expr, &mut ops, 2, env);
+            compile_ops(&expr, &mut ops, 2, env.clone());
 
             dynasm!(ops ; .arch x64 ; ret);
             let buf = ops.finalize().unwrap();

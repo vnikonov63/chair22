@@ -4,7 +4,7 @@
 # to jsut have the -c flag here, right?
 
 tests/%.s: tests/%.snek src/main.rs
-	cargo run --target x86_64-apple-darwin -- -c $< tests/$*.s
+	cargo run --target x86_64-apple-darwin -- $< tests/$*.s
 
 tests/%.run: tests/%.s runtime/start.rs
 	nasm -f macho64 tests/$*.s -o runtime/our_code.o
