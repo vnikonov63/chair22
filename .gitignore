@@ -13,3 +13,5 @@
 # ---- Temp
 *.tmp
 *.swp
+
+.cargo/
