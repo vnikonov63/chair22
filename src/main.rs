@@ -81,6 +81,7 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
         Expr::Id(s)             => format!("mov rax, [rsp - {}]", env[s] * 8),
         Expr::Let(bs, body)     => {
             let mut result_instr = String::new();
+            // TODO: do I actually need the mutable copies right here?
             let mut curr_si = si;
             let mut curr_env = env.clone();
 
@@ -128,24 +129,56 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
 fn compile_ops(e : &Expr, ops : &mut dynasmrt::x64::Assembler, si : i32, env: HashMap<String, i32>) {
     match e {
         Expr::Number(n) => { dynasm!(ops ; .arch x64 ; mov rax, *n); }
-        Expr::Id(s) => {dy}
-        Expr::Let(, ) => {}
-        Expr::UnOp(t, subexptr) => {
-            match t {
+        Expr::Id(s)     => { dynasm!(ops ; .arch x64; mov rax, env[s]); }
+        Expr::Let(bs, body) => {
+            let mut curr_si = si;
+            let mut curr_env = env.clone();
 
+            for (v, e) in bs {
+                compile_ops(&e, ops, si, env.clone());
+                let stack_offset = curr_si * 8;
+                dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
+                curr_env.insert(v.clone(), curr_si);
+                curr_si += 1;
+            }
+            compile_ops(&body, ops, curr_si, curr_env.clone());
+        }
+        Expr::UnOp(t, e) => {
+            match t {
+                Op1::Add1 => { 
+                    compile_ops(&e, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; add rax, 1); 
+                }
+                Op1::Sub1 => {
+                    compile_ops(&e, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; sub rax, 1); 
+                }
             }
         } 
-        Expr::Add1(subexpr) => {
-            compile_ops(&subexpr, ops);
-            dynasm!(ops ; .arch x64 ; add rax, 1);
-        }
-        Expr::Sub1(subexpr) => {
-            compile_ops(&subexpr, ops);
-            dynasm!(ops ; .arch x64 ; sub rax, 1);
-        }
-        Expr::Negate(subexpr) => {
-            compile_ops(&subexpr, ops);
-            dynasm!(ops ; .arch x64; neg rax);
+        Expr::BinOp(t, e1, e2) => {
+            match t {
+                Op2::Plus => {
+                    let stack_offset = si * 8;
+                    compile_ops(&e1, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
+                    compile_ops(&e2, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; add rax, [rsp - stack_offset]);
+                }
+                Op2::Minus => {
+                    let stack_offset = si * 8;
+                    compile_ops(&e2, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
+                    compile_ops(&e1, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; sub rax, [rsp - stack_offset]);
+                }
+                Op2::Times => {
+                    let stack_offset = si * 8;
+                    compile_ops(&e1, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
+                    compile_ops(&e2, ops, si, env.clone());
+                    dynasm!(ops ; .arch x64 ; imul rax, [rsp - stack_offset]);
+                }
+            }
         }
     }
 }
