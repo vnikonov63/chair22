@@ -1,7 +1,9 @@
 mod infra;
 
 success_tests! {
-    simple_let: "6",
+    add1: "1",
+    plus: "2",
+    minus: "3",
 }
 
 /* failure_tests! {

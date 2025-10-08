@@ -91,16 +91,22 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
                  * It would only be acessible inside the body
                  */ 
                 let e_instr = compile_expr(e, si, env.clone());
-                let store_curr_value_instr = format!("\nmov [rsp - {}], rax", curr_si * 8);
-                
+                let store_curr_value_instr = format!("mov [rsp - {}], rax", curr_si * 8);
+
                 curr_env.insert(v.clone(), curr_si);
-                result_instr.push_str("\n");
+                if !result_instr.is_empty() {
+                    result_instr.push_str("\n");
+                }
                 result_instr.push_str(&e_instr);
+                result_instr.push_str("\n");
                 result_instr.push_str(&store_curr_value_instr);
                 curr_si += 1;
             }
-            result_instr.push_str("\n");
-            let b_instr = compile_expr(body, curr_si + 1, curr_env);
+
+            if !result_instr.is_empty() {
+                result_instr.push_str("\n");
+            }
+            let b_instr = compile_expr(body, curr_si, curr_env);
 
             result_instr.push_str(&b_instr);
 
