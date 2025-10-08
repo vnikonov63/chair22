@@ -13,7 +13,7 @@ tests/%.run: tests/%.s runtime/start.rs
 
 clean:
 	cargo clean
-	rm -f test/*.a tests/*.s tests/*.run tests/*.of
+	rm -f tests/*.a tests/*.s tests/*.run tests/*.of
 
 repl:
 	cargo run -- -i

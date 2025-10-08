@@ -15,6 +15,7 @@ success_tests! {
     _12_triple_nested_let: "12",
 }
 
-/* failure_tests! {
-    unbound_id: "Unbound variable identifier x",
-} */
+failure_tests! {
+    _13_unbound_id: "Unbound variable identifier x",
+    _14_duplicate: "Duplicate binding",
+}
