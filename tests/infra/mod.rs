@@ -53,6 +53,10 @@ fn compile(name: &str) -> Result<(String, String), String> {
     } else {
         PathBuf::from("target/debug/boa")
     };
+
+    /* This is the command we are running in the terminal from code. */
+    eprintln!("\n================= COMPILE (-c) =================");
+    eprintln!("Running: {:?} -c {:?} {:?}", boa_path, mk_path(name, Ext::Snek), mk_path(name, Ext::Asm));
     let output_c = Command::new(&boa_path)
         .arg("-c")
         .arg(&mk_path(name, Ext::Snek))
@@ -62,7 +66,13 @@ fn compile(name: &str) -> Result<(String, String), String> {
     if !output_c.status.success() {
         return Err(String::from_utf8(output_c.stderr).unwrap());
     }
+    eprintln!("Exit status: {}", output_c.status);
+    eprintln!("--- STDOUT ---\n{}", String::from_utf8_lossy(&output_c.stdout));
+    eprintln!("--- STDERR ---\n{}", String::from_utf8_lossy(&output_c.stderr));
+    eprintln!("================================================\n");
 
+    eprintln!("\n================= COMPILE (-e) =================");
+    eprintln!("Running: {:?} -e {:?} {:?}", boa_path, mk_path(name, Ext::Snek), mk_path(name, Ext::Asm));
     let output_e = Command::new(&boa_path)
         .arg("-e")
         .arg(&mk_path(name, Ext::Snek))
@@ -71,6 +81,11 @@ fn compile(name: &str) -> Result<(String, String), String> {
     if !output_e.status.success() {
         return Err(String::from_utf8(output_e.stderr).unwrap());
     }
+        eprintln!("Exit status: {}", output_c.status);
+    eprintln!("--- STDOUT ---\n{}", String::from_utf8_lossy(&output_c.stdout));
+    eprintln!("--- STDERR ---\n{}", String::from_utf8_lossy(&output_c.stderr));
+    eprintln!("================================================\n");
+
     let jit_stdout = String::from_utf8(output_e.stdout).unwrap();
 
     eprintln!("JIT result: {}", jit_stdout);

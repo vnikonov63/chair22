@@ -75,27 +75,23 @@ fn parse_expr(s: &Sexp) -> Expr {
     }
 }
 
-
-// TODO: ask a question about this mutable/immutable map because I honestly do not understand.
 fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
     match e {
         Expr::Number(n)         => format!("mov rax, {}", *n),
         Expr::Id(s)             => format!("mov rax, [rsp - {}]", env[s] * 8),
         Expr::Let(bs, body)     => {
             let mut result_instr = String::new();
-            // TODO: Do I need to create copies here?
             let mut curr_si = si;
             let mut curr_env = env.clone();
 
             for (v, e) in bs {
-                /* We do not have an acess to the variable when we are compiling the extression inside the 
+                /* We do not have an acess to the variable when we are compiling the expression inside the 
                  * binding, so we shouldn't be updating it yet;
                  * It would only be acessible inside the body
                  */ 
                 let e_instr = compile_expr(e, si, env.clone());
                 let store_curr_value_instr = format!("\nmov [rsp - {}], rax", curr_si * 8);
                 
-                // TODO: There is no update in Rust/ should we do insert over here?
                 curr_env.insert(v.clone(), curr_si);
                 result_instr.push_str("\n");
                 result_instr.push_str(&e_instr);
@@ -103,7 +99,6 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
                 curr_si += 1;
             }
             result_instr.push_str("\n");
-            // TODO: The + 1 increase is guaranteed by the last iteratin in the loop, right?
             let b_instr = compile_expr(body, curr_si + 1, curr_env);
 
             result_instr.push_str(&b_instr);
@@ -130,61 +125,80 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
     }
 }
 
-// fn compile_ops(e : &Expr, ops : &mut dynasmrt::x64::Assembler) {
-//     match e {
-//         Expr::Num(n) => { dynasm!(ops ; .arch x64 ; mov rax, *n); }
-//         Expr::Add1(subexpr) => {
-//             compile_ops(&subexpr, ops);
-//             dynasm!(ops ; .arch x64 ; add rax, 1);
-//         }
-//         Expr::Sub1(subexpr) => {
-//             compile_ops(&subexpr, ops);
-//             dynasm!(ops ; .arch x64 ; sub rax, 1);
-//         }
-//         Expr::Negate(subexpr) => {
-//             compile_ops(&subexpr, ops);
-//             dynasm!(ops ; .arch x64; neg rax);
-//         }
-//     }
-// }
+fn compile_ops(e : &Expr, ops : &mut dynasmrt::x64::Assembler, si : i32, env: HashMap<String, i32>) {
+    match e {
+        Expr::Number(n) => { dynasm!(ops ; .arch x64 ; mov rax, *n); }
+        Expr::Id(s) => {dy}
+        Expr::Let(, ) => {}
+        Expr::UnOp(t, subexptr) => {
+            match t {
+
+            }
+        } 
+        Expr::Add1(subexpr) => {
+            compile_ops(&subexpr, ops);
+            dynasm!(ops ; .arch x64 ; add rax, 1);
+        }
+        Expr::Sub1(subexpr) => {
+            compile_ops(&subexpr, ops);
+            dynasm!(ops ; .arch x64 ; sub rax, 1);
+        }
+        Expr::Negate(subexpr) => {
+            compile_ops(&subexpr, ops);
+            dynasm!(ops ; .arch x64; neg rax);
+        }
+    }
+}
 
 
 fn main() -> std::io::Result<()> {
-    /* let mut ops = dynasmrt::x64::Assembler::new().unwrap();
-    let start = ops.offset(); */
-
     let args: Vec<String> = env::args().collect();
 
-    let in_name = &args[1];
-    let out_name = &args[2];
+    if args.len() < 2 {
+        eprintln!("Usage: cargo run [CARGO_FLAGS] -- (-c |-e |-g) <input.snek> <output.s>");
+    }
+
+    let flag = &args[1];
+    let in_name = &args[2];
+    let out_name = &args[3];
 
     let mut in_file = File::open(in_name)?;
     let mut in_contents = String::new();
     in_file.read_to_string(&mut in_contents)?;
-
-    let env = HashMap::new();
-
-    // TODO: this parse thing is from the sexpr? How else would it know how to work with a String
     let expr = parse_expr(&parse(&in_contents).unwrap());
-    let result = compile_expr(&expr, 2, env);
-    let asm_program = format!("
+
+    match flag.as_str() {
+        "-c" => {
+            let env = HashMap::new();
+            let result = compile_expr(&expr, 2, env);
+            let asm_program = format!("
 section .text
 global our_code_starts_here
 our_code_starts_here:
   {}
   ret
 ", result);
+            let mut out_file = File::create(out_name)?;
+            out_file.write_all(asm_program.as_bytes())?;
 
-    let mut out_file = File::create(out_name)?;
-    out_file.write_all(asm_program.as_bytes())?;
+        },
+        "-e" => {
+            let mut ops = dynasmrt::x64::Assembler::new().unwrap();
+            let start = ops.offset();
 
-    // compile_ops(&expr, &mut ops);
+            let env = HashMap::new();
+            compile_ops(&expr, &mut ops, 2, env);
 
-    // dynasm!(ops ; .arch x64 ; ret);
-    // let buf = ops.finalize().unwrap();
-    // let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
-    // let result = jitted_fn();
-    // println!("{}", result);
-
+            dynasm!(ops ; .arch x64 ; ret);
+            let buf = ops.finalize().unwrap();
+            let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
+            let result = jitted_fn();
+            println!("{}", result);
+        },
+        _    => {
+            eprintln!("Unknown flag: {}", flag);
+            eprintln!("Allowed options: -c, -e, -d");
+        }
+    }
     Ok(())
 }

@@ -1,7 +1,7 @@
 .SECONDARY:
 
 tests/%.s: tests/%.snek src/main.rs
-	cargo run --target x86_64-apple-darwin -- $< tests/$*.s
+	cargo run -c --target x86_64-apple-darwin -- $< tests/$*.s
 
 tests/%.run: tests/%.s runtime/start.rs
 	nasm -f macho64 test/$*.s -o runtime/our_code.o
