@@ -193,7 +193,6 @@ fn main() -> std::io::Result<()> {
 
     let flag = &args[1];
     let in_name = &args[2];
-    let out_name = &args[3];
 
     let mut in_file = File::open(in_name)?;
     let mut in_contents = String::new();
@@ -202,6 +201,10 @@ fn main() -> std::io::Result<()> {
 
     match flag.as_str() {
         "-c" => {
+            let out_name = &args[3];
+            if args.len() < 4 {
+                eprintln!("Usage: cargo run [CARGO_FLAGS] -- -c <input.snek> <output.s>");
+            }
             let env = HashMap::new();
             let result = compile_expr(&expr, 2, env);
             let asm_program = format!("
