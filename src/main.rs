@@ -184,22 +184,18 @@ fn file_to_expr(in_name: &str) -> std::io::Result<Expr> {
     Ok(parse_expr(&parse(&in_contents).unwrap()))
 }
 
-fn generate_mode(in_name: &str, out_name: &str) -> std::io::Result<()> {
+fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
     let expr = file_to_expr(in_name)?;
 
     let env = HashMap::new();
     let result = compile_expr(&expr, 2, env.clone());
-    let asm_program = format!("
+    Ok(format!("
 section .text
 global our_code_starts_here
 our_code_starts_here:
   {}
   ret
-", result);
-    let mut out_file = File::create(out_name)?;
-    out_file.write_all(asm_program.as_bytes())?;
-
-    Ok(())
+", result))
 }
 
 fn eval_mode(in_name: &str) -> std::io::Result<()> {
@@ -240,15 +236,17 @@ fn main() -> std::io::Result<()> {
             let in_name = &args[2];
             let out_name = &args[3];
 
-            let _ = generate_mode(in_name, out_name);
+            let asm_program = generate_string_mode(in_name)?;
+
+            let mut out_file = File::create(out_name)?;
+            out_file.write_all(asm_program.as_bytes())?;
         },
         "-e" => {
             if args.len() < 3 {
                 eprintln!("Usage: cargo run [CARGO_FLAGS] -- -e <input.snek>");
             }
             let in_name = &args[2];
-            let _ = eval_mode(in_name);
-
+            eval_mode(in_name)?;
         },
         "-g" => {
             if args.len() < 4 {
@@ -257,6 +255,13 @@ fn main() -> std::io::Result<()> {
 
             let in_name = &args[2];
             let out_name = &args[3];
+
+            let asm_program = generate_string_mode(in_name)?;
+            eval_mode(in_name)?;
+
+
+            let mut out_file = File::create(out_name)?;
+            out_file.write_all(asm_program.as_bytes())?;
         },
         _    => {
             eprintln!("Unknown flag: {}", flag);
