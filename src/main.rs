@@ -129,7 +129,10 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> String {
 fn compile_ops(e : &Expr, ops : &mut dynasmrt::x64::Assembler, si : i32, env: HashMap<String, i32>) {
     match e {
         Expr::Number(n) => { dynasm!(ops ; .arch x64 ; mov rax, *n); }
-        Expr::Id(s)     => { dynasm!(ops ; .arch x64; mov rax, env[s]); }
+        Expr::Id(s)     => {
+            let stack_offset = env[s] * 8;
+            dynasm!(ops ; .arch x64 ; mov rax, [rsp - stack_offset]);
+        }
         Expr::Let(bs, body) => {
             let mut curr_si = si;
             let mut curr_env = env.clone();
