@@ -3,6 +3,7 @@ use std::mem;
 use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use sexp::*;
 use sexp::Atom::*;
@@ -12,6 +13,12 @@ use dynasmrt::{dynasm, DynasmApi};
 #[derive(Debug, Clone)]
 enum Reg {
     Rax,
+}
+
+fn reg_to_string(reg: &Reg) -> &str {
+  match reg {
+    Reg::Rax => "rax",
+  }
 }
 
 #[derive(Debug, Clone)]
@@ -24,7 +31,26 @@ enum Instr {
     MulRaxMemFromStack(i32),
     MovToStack(Reg, i32),  
     MovFromStack(Reg, i32),
+}
 
+fn instr_to_string(instr: &Instr) -> String {
+  match instr {
+    Instr::Mov(reg, val) => format!("mov {}, {}", reg_to_string(reg), val),
+    Instr::Add(reg, val) => format!("add {}, {}", reg_to_string(reg), val),
+    Instr::Sub(reg, val) => format!("sub {}, {}", reg_to_string(reg), val),
+    Instr::AddRaxMemFromStack(offset) => format!("add rax, [rsp - {}]", offset),
+    Instr::SubRaxMemFromStack(offset) => format!("sub rax, [rsp - {}]", offset),
+    Instr::MulRaxMemFromStack(offset) =>format!("imul rax, [rsp - {}]", offset),
+    Instr::MovToStack(reg, offset) => format!("mov [rsp - {}], {}", offset, reg_to_string(reg)),
+    Instr::MovFromStack(reg, offset) => format!("mov {}, [rsp - {}]", reg_to_string(reg), offset),
+  }
+}
+
+fn instrs_to_string(instrs: &Vec<Instr>) -> std::io::Result<String> {
+  Ok(instrs.iter()
+    .map(instr_to_string)
+    .collect::<Vec<String>>()
+    .join("\n"))
 }
 
 enum Op1 {
@@ -48,8 +74,8 @@ enum Expr {
 
 fn parse_expr(s: &Sexp) -> Expr {
     match s {
-        Sexp::Atom(I(n))                                                       => Expr::Number(i32::try_from(*n).unwrap()),
-        Sexp::Atom(S(s))                                                       => Expr::Id(s.clone()),
+        Sexp::Atom(I(n)) => Expr::Number(i32::try_from(*n).unwrap()),
+        Sexp::Atom(S(s)) => Expr::Id(s.clone()),
         Sexp::List(vec) => {
             match &vec[..] {
                 [Sexp::Atom(S(op)), Sexp::List(bindings), body] if op == "let" => {
@@ -70,43 +96,17 @@ fn parse_expr(s: &Sexp) -> Expr {
                     }
                     Expr::Let(bs, Box::new(parse_expr(body)))
                 }
-                [Sexp::Atom(S(op)), e] if op == "add1"                         => Expr::UnOp(Op1::Add1, Box::new(parse_expr(e))),
-                [Sexp::Atom(S(op)), e] if op == "sub1"                         => Expr::UnOp(Op1::Sub1, Box::new(parse_expr(e))),
+                [Sexp::Atom(S(op)), e] if op == "add1" => Expr::UnOp(Op1::Add1, Box::new(parse_expr(e))),
+                [Sexp::Atom(S(op)), e] if op == "sub1" => Expr::UnOp(Op1::Sub1, Box::new(parse_expr(e))),
                 
-                [Sexp::Atom(S(op)), e1, e2] if op == "+"                       => Expr::BinOp(Op2::Plus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "-"                       => Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "*"                       => Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                _                                                              => panic!("Parse Error"),
+                [Sexp::Atom(S(op)), e1, e2] if op == "+" => Expr::BinOp(Op2::Plus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
+                [Sexp::Atom(S(op)), e1, e2] if op == "-" => Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
+                [Sexp::Atom(S(op)), e1, e2] if op == "*" => Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
+                _ => panic!("Parse Error"),
             }
         },
-        _                                                                      => panic!("Parse Error"),
+        _ => panic!("Parse Error"),
     }
-}
-
-fn reg_to_string(reg: &Reg) -> &str {
-  match reg {
-    Reg::Rax => "rax",
-  }
-}
-
-fn instr_to_string(instr: &Instr) -> String {
-  match instr {
-    Instr::Mov(reg, val) => format!("mov {}, {}", reg_to_string(reg), val),
-    Instr::Add(reg, val) => format!("add {}, {}", reg_to_string(reg), val),
-    Instr::Sub(reg, val) => format!("sub {}, {}", reg_to_string(reg), val),
-    Instr::AddRaxMemFromStack(offset) => format!("add rax, [rsp - {}]", offset),
-    Instr::SubRaxMemFromStack(offset) => format!("sub rax, [rsp - {}]", offset),
-    Instr::MulRaxMemFromStack(offset) =>format!("imul rax, [rsp - {}]", offset),
-    Instr::MovToStack(reg, offset) => format!("mov [rsp - {}], {}", offset, reg_to_string(reg)),
-    Instr::MovFromStack(reg, offset) => format!("mov {}, [rsp - {}]", reg_to_string(reg), offset),
-  }
-}
-
-fn instrs_to_string(instrs: &Vec<Instr>) -> std::io::Result<String> {
-  Ok(instrs.iter()
-    .map(instr_to_string)
-    .collect::<Vec<String>>()
-    .join("\n"))
 }
 
 // TODO: Ask what is happening here in case in the future I decide to add more registers, dynsasm
@@ -137,18 +137,21 @@ fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Re
             }
         },
         Expr::Let(bs, body) => {
-            let mut result_instr : Vec<Instr>= Vec::new();
+            let mut result_instr : Vec<Instr> = Vec::new();
             let mut curr_si = si;
             let mut curr_env = env.clone();
 
+            // JUST LIKE IN BFS WE ARE HERE ON THE SAME LEVEL SO WE CAN CHECK UNIQUENESS AT IT WITH A HASH_MAP
+            let mut level = HashSet::new();
             for (v, e) in bs {
-                if curr_env.contains_key(v) {
+                if level.contains(v) {
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
                 }
-                let e_instr = compile_to_instr(e, si, env.clone())?;
+                let e_instr = compile_to_instr(e, si, curr_env.clone())?;
                 result_instr.extend(e_instr);
                 result_instr.push(Instr::MovToStack(Reg::Rax, curr_si * 8));
 
+                level.insert(v.clone());
                 curr_env.insert(v.clone(), curr_si);
                 curr_si += 1;
             }
@@ -158,11 +161,11 @@ fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Re
 
             Ok(result_instr)
         },
-        Expr::UnOp(op, e)       => {
+        Expr::UnOp(op, e) => {
             let mut instr = compile_to_instr(e, si, env.clone())?;
             match op {
-                Op1::Add1       => instr.push(Instr::Add(Reg::Rax, 1)),
-                Op1::Sub1       => instr.push(Instr::Sub(Reg::Rax, 1)),
+                Op1::Add1 => instr.push(Instr::Add(Reg::Rax, 1)),
+                Op1::Sub1 => instr.push(Instr::Sub(Reg::Rax, 1)),
             }
             Ok(instr)
         },
