@@ -72,10 +72,10 @@ enum Expr {
     BinOp(Op2, Box<Expr>, Box<Expr>)
 }
 
-fn parse_expr(s: &Sexp) -> Expr {
+fn parse_expr(s: &Sexp) -> std::io::Result<Expr> {
     match s {
-        Sexp::Atom(I(n)) => Expr::Number(i32::try_from(*n).unwrap()),
-        Sexp::Atom(S(s)) => Expr::Id(s.clone()),
+        Sexp::Atom(I(n)) => Ok(Expr::Number(i32::try_from(*n).unwrap())),
+        Sexp::Atom(S(s)) => Ok(Expr::Id(s.clone())),
         Sexp::List(vec) => {
             match &vec[..] {
                 [Sexp::Atom(S(op)), Sexp::List(bindings), body] if op == "let" => {
@@ -85,27 +85,28 @@ fn parse_expr(s: &Sexp) -> Expr {
                             Sexp::List(pair) => {
                                 match &pair[..] {
                                     [Sexp::Atom(S(name)), e] => {
-                                        let pair = (name.clone(), parse_expr(e));
+                                        let parsed = parse_expr(e)?;
+                                        let pair = (name.clone(), parsed);
                                         bs.push(pair);
                                     }
-                                    _ => panic!("Parse Error in Let Binding"),
+                                    _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error in Let Binding")),
                                 }
                             }
-                            _ => panic!("Parse Error in Let Binding"),
+                            _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error in Let Binding")),
                         }
                     }
-                    Expr::Let(bs, Box::new(parse_expr(body)))
+                    Ok(Expr::Let(bs, Box::new(parse_expr(body)?)))
                 }
-                [Sexp::Atom(S(op)), e] if op == "add1" => Expr::UnOp(Op1::Add1, Box::new(parse_expr(e))),
-                [Sexp::Atom(S(op)), e] if op == "sub1" => Expr::UnOp(Op1::Sub1, Box::new(parse_expr(e))),
-                
-                [Sexp::Atom(S(op)), e1, e2] if op == "+" => Expr::BinOp(Op2::Plus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "-" => Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                [Sexp::Atom(S(op)), e1, e2] if op == "*" => Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)), Box::new(parse_expr(e2))),
-                _ => panic!("Parse Error"),
+                [Sexp::Atom(S(op)), e] if op == "add1" => Ok(Expr::UnOp(Op1::Add1, Box::new(parse_expr(e)?))),
+                [Sexp::Atom(S(op)), e] if op == "sub1" => Ok(Expr::UnOp(Op1::Sub1, Box::new(parse_expr(e)?))),
+
+                [Sexp::Atom(S(op)), e1, e2] if op == "+" => Ok(Expr::BinOp(Op2::Plus, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
+                [Sexp::Atom(S(op)), e1, e2] if op == "-" => Ok(Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
+                [Sexp::Atom(S(op)), e1, e2] if op == "*" => Ok(Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
+                _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error")),
             }
         },
-        _ => panic!("Parse Error"),
+        _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error")),
     }
 }
 
@@ -205,7 +206,9 @@ fn file_to_expr(in_name: &str) -> std::io::Result<Expr> {
     let mut in_file = File::open(in_name)?;
     let mut in_contents = String::new();
     in_file.read_to_string(&mut in_contents)?;
-    Ok(parse_expr(&parse(&in_contents).unwrap()))
+    // `parse` returns a Result<Sexp, _> from the `sexp` crate; propagate any errors
+    let sexp = parse(&in_contents).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Sexp parse error: {}", e)))?;
+    parse_expr(&sexp)
 }
 
 fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
