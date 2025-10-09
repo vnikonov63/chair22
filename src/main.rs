@@ -9,6 +9,24 @@ use sexp::Atom::*;
 
 use dynasmrt::{dynasm, DynasmApi};
 
+#[derive(Debug, Clone)]
+enum Reg {
+    Rax,
+}
+
+#[derive(Debug, Clone)]
+enum Instr {
+    Mov(Reg, i32),         
+    Add(Reg, i32),         
+    Sub(Reg, i32),         
+    AddRaxMemFromStack(i32),    
+    SubRaxMemFromStack(i32),
+    MulRaxMemFromStack(i32),
+    MovToStack(Reg, i32),  
+    MovFromStack(Reg, i32),
+
+}
+
 enum Op1 {
     Add1,
     Sub1
@@ -65,17 +83,61 @@ fn parse_expr(s: &Sexp) -> Expr {
     }
 }
 
-fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Result<String> {
+fn reg_to_string(reg: &Reg) -> &str {
+  match reg {
+    Reg::Rax => "rax",
+  }
+}
+
+fn instr_to_string(instr: &Instr) -> String {
+  match instr {
+    Instr::Mov(reg, val) => format!("mov {}, {}", reg_to_string(reg), val),
+    Instr::Add(reg, val) => format!("add {}, {}", reg_to_string(reg), val),
+    Instr::Sub(reg, val) => format!("sub {}, {}", reg_to_string(reg), val),
+    Instr::AddRaxMemFromStack(offset) => format!("add rax, [rsp - {}]", offset),
+    Instr::SubRaxMemFromStack(offset) => format!("sub rax, [rsp - {}]", offset),
+    Instr::MulRaxMemFromStack(offset) =>format!("imul rax, [rsp - {}]", offset),
+    Instr::MovToStack(reg, offset) => format!("mov [rsp - {}], {}", offset, reg_to_string(reg)),
+    Instr::MovFromStack(reg, offset) => format!("mov {}, [rsp - {}]", reg_to_string(reg), offset),
+  }
+}
+
+fn instrs_to_string(instrs: &Vec<Instr>) -> std::io::Result<String> {
+  Ok(instrs.iter()
+    .map(instr_to_string)
+    .collect::<Vec<String>>()
+    .join("\n"))
+}
+
+// TODO: Ask what is happening here in case in the future I decide to add more registers, dynsasm
+// does not just take the strings, and we might need to use something different, right?
+fn instr_to_dynasm(ops : &mut dynasmrt::x64::Assembler, instrs: &Vec<Instr>) -> std::io::Result<()> {
+    for instr in instrs {
+        match instr {
+            Instr::Mov(Reg::Rax, val) => { dynasm!(ops ; .arch x64 ; mov rax, *val); }
+            Instr::Add(Reg::Rax, val) => { dynasm!(ops ; .arch x64 ; add rax, *val); }
+            Instr::Sub(Reg::Rax, val) => { dynasm!(ops ; .arch x64 ; sub rax, *val); }
+            Instr::AddRaxMemFromStack(offset) => { dynasm!(ops ; .arch x64 ; add rax, [rsp - *offset]); }
+            Instr::SubRaxMemFromStack(offset) => { dynasm!(ops ; .arch x64 ; sub rax, [rsp - *offset]); }
+            Instr::MulRaxMemFromStack(offset) => { dynasm!(ops ; .arch x64 ; imul rax, [rsp - *offset]); }
+            Instr::MovToStack(Reg::Rax, offset) => { dynasm!(ops ; .arch x64 ; mov [rsp - *offset], rax); }
+            Instr::MovFromStack(Reg::Rax, offset) => { dynasm!(ops ; .arch x64 ; mov rax, [rsp - *offset]); }
+        }
+    }
+    Ok(())
+}
+
+fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Result<Vec<Instr>> {
     match e {
-        Expr::Number(n)         => Ok(format!("mov rax, {}", *n)),
-        Expr::Id(s)             => {
+        Expr::Number(n) => Ok(vec![Instr::Mov(Reg::Rax, *n)]),
+        Expr::Id(s) => {
             match env.get(s) {
-                Some(offset) => Ok(format!("mov rax, [rsp - {}]", offset * 8)),
+                Some(offset) => Ok(vec![Instr::MovFromStack(Reg::Rax, offset * 8)]),
                 None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier {}", s))),
             }
-        }
-        Expr::Let(bs, body)     => {
-            let mut result_instr = String::new();
+        },
+        Expr::Let(bs, body) => {
+            let mut result_instr : Vec<Instr>= Vec::new();
             let mut curr_si = si;
             let mut curr_env = env.clone();
 
@@ -83,116 +145,56 @@ fn compile_expr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Result
                 if curr_env.contains_key(v) {
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
                 }
-                let e_instr = compile_expr(e, si, env.clone())?;
-                let store_curr_value_instr = format!("mov [rsp - {}], rax", curr_si * 8);
+                let e_instr = compile_to_instr(e, si, env.clone())?;
+                result_instr.extend(e_instr);
+                result_instr.push(Instr::MovToStack(Reg::Rax, curr_si * 8));
 
                 curr_env.insert(v.clone(), curr_si);
-                if !result_instr.is_empty() {
-                    result_instr.push_str("\n");
-                }
-                result_instr.push_str(&e_instr);
-                result_instr.push_str("\n");
-                result_instr.push_str(&store_curr_value_instr);
                 curr_si += 1;
             }
 
-            if !result_instr.is_empty() {
-                result_instr.push_str("\n");
-            }
-            let b_instr = compile_expr(body, curr_si, curr_env)?;
-
-            result_instr.push_str(&b_instr);
+            let b_instr = compile_to_instr(body, curr_si, curr_env)?;
+            result_instr.extend(b_instr);
 
             Ok(result_instr)
         },
         Expr::UnOp(op, e)       => {
-            let instr = compile_expr(e, si, env.clone())?;
+            let mut instr = compile_to_instr(e, si, env.clone())?;
             match op {
-                Op1::Add1       => Ok(format!("{instr}\nadd rax, 1")),
-                Op1::Sub1       => Ok(format!("{instr}\nsub rax, 1")),
+                Op1::Add1       => instr.push(Instr::Add(Reg::Rax, 1)),
+                Op1::Sub1       => instr.push(Instr::Sub(Reg::Rax, 1)),
             }
+            Ok(instr)
         },
         Expr::BinOp(op, e1, e2) => {
-            let e1_instr = compile_expr(e1, si, env.clone())?;
-            let e2_instr = compile_expr(e2, si + 1, env.clone())?;
+            let mut result_instr: Vec<Instr> = Vec::new();
+
             let stack_offset = si * 8;
+            let e1_instr = compile_to_instr(e1, si, env.clone())?;
+            let e2_instr = compile_to_instr(e2, si + 1, env.clone())?;
+
             match op {
-                Op2::Plus       => Ok(format!("{e1_instr}\nmov [rsp - {stack_offset}], rax \n{e2_instr}\nadd rax, [rsp - {stack_offset}]")),
-                Op2::Minus      => Ok(format!("{e2_instr}\nmov [rsp - {stack_offset}], rax \n{e1_instr}\nsub rax, [rsp - {stack_offset}]")),
-                Op2::Times      => Ok(format!("{e1_instr}\nmov [rsp - {stack_offset}], rax \n{e2_instr}\nimul rax, [rsp - {stack_offset}]")),
+                Op2::Plus => {
+                    result_instr.extend(e1_instr);
+                    result_instr.push(Instr::MovToStack(Reg::Rax, stack_offset));
+                    result_instr.extend(e2_instr);
+                    result_instr.push(Instr::AddRaxMemFromStack(stack_offset));
+                }
+                Op2::Minus => {
+                    result_instr.extend(e2_instr);
+                    result_instr.push(Instr::MovToStack(Reg::Rax, stack_offset));
+                    result_instr.extend(e1_instr);
+                    result_instr.push(Instr::SubRaxMemFromStack(stack_offset));
+                }
+                Op2::Times => {
+                    result_instr.extend(e1_instr);
+                    result_instr.push(Instr::MovToStack(Reg::Rax, stack_offset));
+                    result_instr.extend(e2_instr);
+                    result_instr.push(Instr::MulRaxMemFromStack(stack_offset));
+                }
             }
+            Ok(result_instr)
         },
-    }
-}
-
-fn compile_ops(e : &Expr, ops : &mut dynasmrt::x64::Assembler, si : i32, env: HashMap<String, i32>) -> std::io::Result<()> {
-    match e {
-        Expr::Number(n)        => { dynasm!(ops ; .arch x64 ; mov rax, *n); Ok(()) }
-        Expr::Id(s)            => {
-            match env.get(s) {
-                Some(offset) => { dynasm!(ops ; .arch x64 ; mov rax, [rsp - offset * 8]); Ok(())},
-                None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier{}", s))),
-            }
-        }
-        Expr::Let(bs, body)    => {
-            let mut curr_si = si;
-            let mut curr_env = env.clone();
-
-            for (v, e) in bs {
-                if curr_env.contains_key(v) {
-                    return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
-                }
-                compile_ops(&e, ops, si, env.clone())?;
-                let stack_offset = curr_si * 8;
-                dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
-                curr_env.insert(v.clone(), curr_si);
-                curr_si += 1;
-            }
-            compile_ops(&body, ops, curr_si, curr_env.clone())?;
-            Ok(())
-        }
-        Expr::UnOp(t, e)       => {
-            match t {
-                Op1::Add1      => { 
-                    compile_ops(&e, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; add rax, 1); 
-                    Ok(())
-                }
-                Op1::Sub1      => {
-                    compile_ops(&e, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; sub rax, 1); 
-                    Ok(())
-                }
-            }
-        } 
-        Expr::BinOp(t, e1, e2) => {
-            match t {
-                Op2::Plus      => {
-                    let stack_offset = si * 8;
-                    compile_ops(&e1, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
-                    compile_ops(&e2, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; add rax, [rsp - stack_offset]);
-                    Ok(())
-                }
-                Op2::Minus     => {
-                    let stack_offset = si * 8;
-                    compile_ops(&e2, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
-                    compile_ops(&e1, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; sub rax, [rsp - stack_offset]);
-                    Ok(())
-                }
-                Op2::Times     => {
-                    let stack_offset = si * 8;
-                    compile_ops(&e1, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; mov [rsp - stack_offset], rax);
-                    compile_ops(&e2, ops, si, env.clone())?;
-                    dynasm!(ops ; .arch x64 ; imul rax, [rsp - stack_offset]);
-                    Ok(())
-                }
-            }
-        }
     }
 }
 
@@ -207,14 +209,10 @@ fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
     let expr = file_to_expr(in_name)?;
 
     let env = HashMap::new();
-    let result = compile_expr(&expr, 2, env.clone())?;
-    Ok(format!("
-section .text
-global our_code_starts_here
-our_code_starts_here:
-  {}
-  ret
-", result))
+    let instrs = compile_to_instr(&expr, 2, env.clone())?;
+    let result = instrs_to_string(&instrs)?;
+
+    Ok(format!("\nsection .text\nglobal our_code_starts_here\nour_code_starts_here:\n  {}\n  ret\n", result))
 }
 
 fn eval_mode(in_name: &str) -> std::io::Result<()> {
@@ -224,9 +222,10 @@ fn eval_mode(in_name: &str) -> std::io::Result<()> {
     let start = ops.offset();
 
     let env = HashMap::new();
-    let _ = compile_ops(&expr, &mut ops, 2, env.clone())?;
-
+    let instrs = compile_to_instr(&expr, 2, env.clone())?;
+    instr_to_dynasm(&mut ops, &instrs)?;
     dynasm!(ops ; .arch x64 ; ret);
+    
     let buf = ops.finalize().unwrap();
     let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
     let result = jitted_fn();
