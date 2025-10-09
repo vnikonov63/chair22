@@ -1,8 +1,5 @@
 .SECONDARY:
 
-#TODO: This are the commands that we only use in Ahead of Time compiling, so it would be enough
-# to jsut have the -c flag here, right?
-
 tests/%.s: tests/%.snek src/main.rs
 	cargo run --target x86_64-apple-darwin -- $< tests/$*.s
 
