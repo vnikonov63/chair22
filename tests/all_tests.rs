@@ -27,5 +27,7 @@ repl_tests! {
     _18_repl_plus: ["(+ 1 17)"] => ["18"],
     _19_repl_minus: ["(- 25 6)"] => ["19"],
     _20_repl_times: ["(* 4 5)"] => ["20"],
+    _21_repl_exit: ["exit"] => ["Thanks for you business with us!"],
+    _22_repl_quit: ["quit"] => ["Thanks for you business with us!"],
 
 }

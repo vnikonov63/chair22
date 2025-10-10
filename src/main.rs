@@ -315,7 +315,7 @@ fn main() -> std::io::Result<()> {
         },
         "-i" => {
             let mut reader = io::stdin().lock();
-            println!("Press ^D to exit the REPL interative mode.");
+            println!("Press ^D, exit or quit to exit the REPL interative mode.");
 
             loop {
                 print!("> ");
@@ -324,7 +324,10 @@ fn main() -> std::io::Result<()> {
                 let mut buffer = String::new();
                 match reader.read_line(&mut buffer) {
                     Ok(0) => {
-                        println!("Thanks for you business with us!");
+                        // The Ctr-D (^D) wouldn;t create a new line, because the escape character is not 
+                        // printed, so it would appear as if my farewell message is with the > delimeter
+                        // without the newline character at the begining of the message below.
+                        println!("\nThanks for you business with us!");
                         break;
                     },
                     Ok(_) => {
@@ -332,6 +335,12 @@ fn main() -> std::io::Result<()> {
 
                         if input.is_empty() {
                             continue;
+                        }
+
+                        let command = input.to_lowercase();
+                        if command == "exit" || command == "quit" {
+                            println!("Thanks for you business with us!");
+                            break;
                         }
 
                         eval_mode_command(input)?;
