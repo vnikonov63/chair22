@@ -19,3 +19,13 @@ failure_tests! {
     _13_unbound_id: "Unbound variable identifier x",
     _14_duplicate: "Duplicate binding",
 }
+
+repl_tests! {
+    _15_repl_simple_numbers: ["42", "0", "-17"] => ["42", "0", "-17"],
+    _16_repl_add1: ["(add1 15)"] => ["16"],
+    _17_repl_sub1: ["(sub1 18)"] => ["17"],
+    _18_repl_plus: ["(+ 1 17)"] => ["18"],
+    _19_repl_minus: ["(- 25 6)"] => ["19"],
+    _20_repl_times: ["(* 4 5)"] => ["20"],
+
+}

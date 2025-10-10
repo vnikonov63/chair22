@@ -6,4 +6,5 @@ Compiler accepts the following arguments:
 cargo run -- -c tests/test1.snek tests/test1.s
 cargo run -- -e tests/test1.snek
 cargo run -- -g tests/test1.snek tests/test1.s
+cargo run -- -i
 ```
