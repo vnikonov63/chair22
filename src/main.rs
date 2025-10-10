@@ -1,6 +1,8 @@
 use std::env;
 use std::mem;
 use std::fs::File;
+// TODO: ask whether I should import the prelude thingy here, if I already imported the io.
+use std::io;
 use std::io::prelude::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -222,7 +224,7 @@ fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
     Ok(format!("\nsection .text\nglobal our_code_starts_here\nour_code_starts_here:\n  {}\n  ret\n", result))
 }
 
-fn eval_mode(in_name: &str) -> std::io::Result<()> {
+fn eval_mode_file(in_name: &str) -> std::io::Result<()> {
     let expr = file_to_expr(in_name)?;
 
     let mut ops = dynasmrt::x64::Assembler::new().unwrap();
@@ -240,6 +242,27 @@ fn eval_mode(in_name: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+// This is the combination of the logic similar to file_to_expr and eval_mode_file
+fn eval_mode_command(command: &str) -> std::io::Result<()> {
+    let sexp = parse(&command).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Sexp parse error: {}", e)))?;
+    let expr = parse_expr(&sexp)?;
+
+    let mut ops = dynasmrt::x64::Assembler::new().unwrap();
+    let start = ops.offset();
+
+    let env = HashMap::new();
+    let instrs = compile_to_instr(&expr, 2, env.clone())?;
+    instr_to_dynasm(&mut ops, &instrs)?;
+    dynasm!(ops ; .arch x64 ; ret);
+    
+    let buf = ops.finalize().unwrap();
+    let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
+    let result = jitted_fn();
+    println!("{}", result);
+
+    Ok(())
+}
+
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -248,6 +271,7 @@ fn main() -> std::io::Result<()> {
         eprintln!("Usage: cargo run [CARGO_FLAGS] -- -c <input.snek> <output.s>");
         eprintln!("Usage: cargo run [CARGO_FLAGS] -- -e <input.snek>");
         eprintln!("Usage: cargo run [CARGO_FLAGS] -- -g <input.snek> <output.s>");
+        eprintln!("Usage: cargo run [CARGO_FLAGS] -- -i");
     }
 
     let flag = &args[1];
@@ -273,7 +297,7 @@ fn main() -> std::io::Result<()> {
 
             let in_name = &args[2];
 
-            eval_mode(in_name)?;
+            eval_mode_file(in_name)?;
         },
         "-g" => {
             if args.len() < 4 {
@@ -284,14 +308,46 @@ fn main() -> std::io::Result<()> {
             let out_name = &args[3];
 
             let asm_program = generate_string_mode(in_name)?;
-            eval_mode(in_name)?;
+            eval_mode_file(in_name)?;
 
             let mut out_file = File::create(out_name)?;
             out_file.write_all(asm_program.as_bytes())?;
         },
+        "-i" => {
+            let mut reader = io::stdin().lock();
+            println!("Press ^D to exit the REPL interative mode.");
+
+            loop {
+                print!("> ");
+                io::stdout().flush()?;
+
+                let mut buffer = String::new();
+                match reader.read_line(&mut buffer) {
+                    Ok(0) => {
+                        println!("Thanks for you business with us!");
+                        break;
+                    },
+                    Ok(_) => {
+                        let input = buffer.trim();
+
+                        if input.is_empty() {
+                            continue;
+                        }
+
+                        eval_mode_command(input)?;
+                    },
+                    Err(e) => {
+                        eprintln!("Error reading input {}", e);
+                        break;
+
+                    }
+                }
+            }
+
+        },
         _    => {
             eprintln!("Unknown flag: {}", flag);
-            eprintln!("Allowed options: -c, -e, -d");
+            eprintln!("Allowed options: -c, -e, -d, -i");
         }
     }
     Ok(())
