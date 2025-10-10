@@ -301,7 +301,7 @@ fn main() -> std::io::Result<()> {
         },
         "-g" => {
             if args.len() < 4 {
-                eprintln!("Usage: cargo run [CARGO_FLAGS] -- -g <input.snek>");
+                eprintln!("Usage: cargo run [CARGO_FLAGS] -- -g <input.snek> <output.s>");
             }
 
             let in_name = &args[2];
