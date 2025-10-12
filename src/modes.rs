@@ -27,7 +27,8 @@ pub fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
     let expr = file_to_expr(in_name)?;
 
     let env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone())?;
+    let empty_define_env = HashMap::new();
+    let instrs = compile_to_instr(&expr, 2, env.clone(), empty_define_env.clone())?;
     let result = instrs_to_string(&instrs)?;
 
     Ok(format!("\nsection .text\nglobal our_code_starts_here\nour_code_starts_here:\n  {}\n  ret\n", result))
@@ -40,7 +41,8 @@ pub fn eval_mode(in_name: &str) -> std::io::Result<()> {
     let start = ops.offset();
 
     let env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone())?;
+    let empty_define_env = HashMap::new();
+    let instrs = compile_to_instr(&expr, 2, env.clone(), empty_define_env.clone())?;
     instr_to_dynasm(&mut ops, &instrs)?;
     dynasm!(ops ; .arch x64 ; ret);
     
@@ -91,9 +93,8 @@ pub fn repl_mode() -> std::io::Result<()> {
                 let sexp = parse(&command).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Sexp parse error: {}", e)))?;
                 let expr = parse_repl_expr(&sexp)?;
 
-                let env = HashMap::new();
                 let start = ops.offset();
-                let instrs = compile_repl_to_instr(&expr, 2, env.clone(), &mut define_env, &mut ops)?;
+                let instrs = compile_repl_to_instr(&expr, 2, &mut define_env, &mut ops)?;
 
                 // We do not want to print for define
                 if instrs.is_empty() {

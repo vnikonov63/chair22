@@ -7,7 +7,7 @@ use dynasmrt::{dynasm, DynasmApi};
 use crate::expressions::{Expr, ReplExpr, Op1, Op2};
 use crate::instructions::{Reg, Instr, instr_to_dynasm};
 
-pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Result<Vec<Instr>> {
+pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, define_env: HashMap<String, i32>) -> std::io::Result<Vec<Instr>> {
     match e {
         Expr::Number(n) => Ok(vec![Instr::Mov(Reg::Rax, *n)]),
         Expr::Id(s) => {
@@ -15,7 +15,10 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io
                 // the multiplication coerces/dereferences the &i32 here, but in the case
                 // of compile_reple_to_instr I need to dereference it!
                 Some(offset) => Ok(vec![Instr::MovFromStack(Reg::Rax, offset * 8)]),
-                None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier {}", s))),
+                None => match define_env.get(s) {
+                    Some(value) => Ok(vec![Instr::Mov(Reg::Rax, *value)]),
+                    None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier {}", s))),
+                }
             }
         },
         Expr::Let(bs, body) => {
@@ -29,7 +32,7 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io
                 if level.contains(v) {
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
                 }
-                let e_instr = compile_to_instr(e, si, curr_env.clone())?;
+                let e_instr = compile_to_instr(e, si, curr_env.clone(), define_env.clone())?;
                 result_instr.extend(e_instr);
                 result_instr.push(Instr::MovToStack(Reg::Rax, curr_si * 8));
 
@@ -38,13 +41,13 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io
                 curr_si += 1;
             }
 
-            let b_instr = compile_to_instr(body, curr_si, curr_env)?;
+            let b_instr = compile_to_instr(body, curr_si, curr_env, define_env.clone())?;
             result_instr.extend(b_instr);
 
             Ok(result_instr)
         },
         Expr::UnOp(op, e) => {
-            let mut instr = compile_to_instr(e, si, env.clone())?;
+            let mut instr = compile_to_instr(e, si, env.clone(), define_env.clone())?;
             match op {
                 Op1::Add1 => instr.push(Instr::Add(Reg::Rax, 1)),
                 Op1::Sub1 => instr.push(Instr::Sub(Reg::Rax, 1)),
@@ -55,8 +58,8 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io
             let mut result_instr: Vec<Instr> = Vec::new();
 
             let stack_offset = si * 8;
-            let e1_instr = compile_to_instr(e1, si, env.clone())?;
-            let e2_instr = compile_to_instr(e2, si + 1, env.clone())?;
+            let e1_instr = compile_to_instr(e1, si, env.clone(), define_env.clone())?;
+            let e2_instr = compile_to_instr(e2, si + 1, env.clone(), define_env.clone())?;
 
             match op {
                 Op2::Plus => {
@@ -86,13 +89,13 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io
 // I understand this is not really the compile thing, but in my head this is on the same level as compile_to_instr
 pub fn compile_repl_to_instr(
     e: &ReplExpr, si: i32, 
-    env: HashMap<String, i32>, 
     define_env: &mut HashMap<String, i32>, 
     ops: &mut dynasmrt::x64::Assembler
 ) -> std::io::Result<Vec<Instr>> {
     match e {
         ReplExpr::Define(v, e) => {
-            let e_instr = compile_to_instr(e, si, env)?;
+            let env = HashMap::new();
+            let e_instr = compile_to_instr(e, si, env, define_env.clone())?;
 
             /* the running logic */
             let start = ops.offset();
@@ -125,7 +128,10 @@ pub fn compile_repl_to_instr(
                         None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier {}", s))),
                     }
                 }
-                _ => compile_to_instr(e, si, env.clone()),
+                _ => {
+                    let env = HashMap::new();
+                    compile_to_instr(e, si, env, define_env.clone())
+                }
             }
         }
     }
