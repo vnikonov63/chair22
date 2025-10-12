@@ -13,7 +13,6 @@ use crate::parse::{parse_expr, parse_repl_expr};
 use crate::instructions::{instrs_to_string, instr_to_dynasm};
 use crate::compile::{compile_to_instr, compile_repl_to_instr};
 
-
 pub fn file_to_expr(in_name: &str) -> std::io::Result<Expr> {
     let mut in_file = File::open(in_name)?;
     let mut in_contents = String::new();
