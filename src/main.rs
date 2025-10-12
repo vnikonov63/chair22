@@ -334,7 +334,6 @@ fn eval_mode(in_name: &str) -> std::io::Result<()> {
 fn repl_mode() -> std::io::Result<()> {
     // We can reuse this ops later, so we do not compile it every time as new
     let mut ops = dynasmrt::x64::Assembler::new().unwrap();
-    let start = ops.offset();
 
     let mut reader = io::stdin().lock();
     println!("Press ^D, exit or quit to exit the REPL interative mode.");
@@ -373,7 +372,13 @@ fn repl_mode() -> std::io::Result<()> {
                 let expr = parse_repl_expr(&sexp)?;
 
                 let env = HashMap::new();
+                let start = ops.offset();
                 let instrs = compile_repl_to_instr(&expr, 2, env.clone(), &mut define_env, &mut ops)?;
+
+                // We do not want to print for define
+                if instrs.is_empty() {
+                    continue;
+                }
 
                 instr_to_dynasm(&mut ops, &instrs)?;
                 dynasm!(ops ; .arch x64 ; ret);
@@ -383,6 +388,7 @@ fn repl_mode() -> std::io::Result<()> {
                 let buf = reader.lock();
                 let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
                 let result = jitted_fn();
+                
                 println!("{}", result);
             },
             Err(e) => {
