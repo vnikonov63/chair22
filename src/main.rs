@@ -13,6 +13,9 @@ use sexp::Atom::*;
 
 use dynasmrt::{dynasm, DynasmApi};
 
+/* ----------------------------------- */
+/* Instructions Logic */
+
 #[derive(Debug, Clone)]
 enum Reg {
     Rax,
@@ -73,34 +76,41 @@ fn instr_to_dynasm(ops : &mut dynasmrt::x64::Assembler, instrs: &Vec<Instr>) -> 
     }
     Ok(())
 }
+/* ----------------------------------- */
 
-
-#[derive(Debug, Clone, PartialEq)]
-enum Mode {
-    Repl,
-    NonInter
-}
-
+/* ----------------------------------- */
+/* Expressions Logic */
+#[derive(Debug)]
 enum Op1 {
     Add1,
     Sub1
 }
 
+#[derive(Debug)]
 enum Op2 {
     Plus,
     Minus,
     Times
 }
 
+#[derive(Debug)]
 enum Expr {
     Number(i32),
     Id(String),
     Let(Vec<(String, Expr)>, Box<Expr>),
     UnOp(Op1, Box<Expr>),
     BinOp(Op2, Box<Expr>, Box<Expr>),
-    Define(String, Box<Expr>)
 }
 
+#[derive(Debug)]
+enum ReplExpr {
+    Define(String, Box<Expr>),
+    Expr(Box<Expr>),
+}
+/* ----------------------------------- */
+
+/* ----------------------------------- */
+/* PARSING LOGIC */
 fn parse_expr(s: &Sexp) -> std::io::Result<Expr> {
     match s {
         Sexp::Atom(I(n)) => Ok(Expr::Number(i32::try_from(*n).unwrap())),
@@ -133,7 +143,6 @@ fn parse_expr(s: &Sexp) -> std::io::Result<Expr> {
                 [Sexp::Atom(S(op)), e1, e2] if op == "-" => Ok(Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
                 [Sexp::Atom(S(op)), e1, e2] if op == "*" => Ok(Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
 
-                [Sexp::Atom(S(op)), Sexp::Atom(S(v)), e] if op == "define" => Ok(Expr::Define(v.clone(), Box::new(parse_expr(e)?))),
                 _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error")),
             }
         },
@@ -141,11 +150,29 @@ fn parse_expr(s: &Sexp) -> std::io::Result<Expr> {
     }
 }
 
-fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, mode: Mode) -> std::io::Result<Vec<Instr>> {
+fn parse_repl_expr(s: &Sexp) -> std::io::Result<ReplExpr> {
+    match s {
+        Sexp::List(vec) => {
+            match &vec[..] {
+                [Sexp::Atom(S(op)), Sexp::Atom(S(v)), e] if op == "define" => Ok(ReplExpr::Define(v.clone(), Box::new(parse_expr(e)?))),
+
+                _ => Ok(ReplExpr::Expr(Box::new(parse_expr(s)?))),
+            }
+        }
+        _ => Ok(ReplExpr::Expr(Box::new(parse_expr(s)?))),
+    }
+}
+/* ----------------------------------- */
+
+/* ----------------------------------- */
+/* Compiling Logic */
+fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>) -> std::io::Result<Vec<Instr>> {
     match e {
         Expr::Number(n) => Ok(vec![Instr::Mov(Reg::Rax, *n)]),
         Expr::Id(s) => {
             match env.get(s) {
+                // the multiplication coerces/dereferences the &i32 here, but in the case
+                // of compile_reple_to_instr I need to dereference it!
                 Some(offset) => Ok(vec![Instr::MovFromStack(Reg::Rax, offset * 8)]),
                 None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier {}", s))),
             }
@@ -161,7 +188,7 @@ fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, mode: Mode) ->
                 if level.contains(v) {
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
                 }
-                let e_instr = compile_to_instr(e, si, curr_env.clone(), mode.clone())?;
+                let e_instr = compile_to_instr(e, si, curr_env.clone())?;
                 result_instr.extend(e_instr);
                 result_instr.push(Instr::MovToStack(Reg::Rax, curr_si * 8));
 
@@ -170,13 +197,13 @@ fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, mode: Mode) ->
                 curr_si += 1;
             }
 
-            let b_instr = compile_to_instr(body, curr_si, curr_env, mode.clone())?;
+            let b_instr = compile_to_instr(body, curr_si, curr_env)?;
             result_instr.extend(b_instr);
 
             Ok(result_instr)
         },
         Expr::UnOp(op, e) => {
-            let mut instr = compile_to_instr(e, si, env.clone(), mode.clone())?;
+            let mut instr = compile_to_instr(e, si, env.clone())?;
             match op {
                 Op1::Add1 => instr.push(Instr::Add(Reg::Rax, 1)),
                 Op1::Sub1 => instr.push(Instr::Sub(Reg::Rax, 1)),
@@ -187,8 +214,8 @@ fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, mode: Mode) ->
             let mut result_instr: Vec<Instr> = Vec::new();
 
             let stack_offset = si * 8;
-            let e1_instr = compile_to_instr(e1, si, env.clone(), mode.clone())?;
-            let e2_instr = compile_to_instr(e2, si + 1, env.clone(), mode.clone())?;
+            let e1_instr = compile_to_instr(e1, si, env.clone())?;
+            let e2_instr = compile_to_instr(e2, si + 1, env.clone())?;
 
             match op {
                 Op2::Plus => {
@@ -211,18 +238,61 @@ fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, mode: Mode) ->
                 }
             }
             Ok(result_instr)
-        },
-        Expr::Define(v, e) => {
-            let mut result_instr: Vec<Instr> = Vec::new();
-            if mode == Mode::NonInter {
-                return Err(std::io::Error::new(std::io::ErrorKind::Other, "Define could only be used in REPL"));
-            }
-            Ok(result_instr)
         }
-
     }
 }
 
+// I understand this is not really the compile thing, but in my head this is on the same level as compile_to_instr
+fn compile_repl_to_instr(
+    e: &ReplExpr, si: i32, 
+    env: HashMap<String, i32>, 
+    define_env: &mut HashMap<String, i32>, 
+    ops: &mut dynasmrt::x64::Assembler
+) -> std::io::Result<Vec<Instr>> {
+    match e {
+        ReplExpr::Define(v, e) => {
+            let e_instr = compile_to_instr(e, si, env)?;
+
+            /* the running logic */
+            let start = ops.offset();
+            instr_to_dynasm(ops, &e_instr)?;
+            dynasm!(ops ; .arch x64 ; ret);
+            ops.commit().unwrap();
+            let reader = ops.reader();
+            let buf = reader.lock();
+            let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
+            let result = jitted_fn();
+            define_env.insert(v.clone(), result as i32);
+
+            Ok(vec![])
+        }
+        ReplExpr::Expr(e) => {
+            // e initially here is &Box<Expr>
+            // *e dereferences to Box<Expr>
+            // **e dereferences to Expr
+            // &**e makes it &Expr, so we can use all of the previous non repl stuff 
+            match &**e {
+                Expr::Id(s) => {
+                    // we can only acess this on the very very top level
+                    // as this is the only time we are calling for the compile_repl... thingy
+                    // so we automatically check two boxes
+                    // 1. define can only be on the uppermost level
+                    // 2. we can overshadow the variables "defined" within the let statements, 
+                    // as it is the compile_to_instr business now BINGO.
+                    match define_env.get(s) {
+                        Some(val) => Ok(vec![Instr::Mov(Reg::Rax, *val)]),
+                        None => Err(std::io::Error::new(std::io::ErrorKind::Other, format!("Unbound variable identifier {}", s))),
+                    }
+                }
+                _ => compile_to_instr(e, si, env.clone()),
+            }
+        }
+    }
+}
+/* ----------------------------------- */
+
+/* ----------------------------------- */
+/* Different Modes Logic */
 fn file_to_expr(in_name: &str) -> std::io::Result<Expr> {
     let mut in_file = File::open(in_name)?;
     let mut in_contents = String::new();
@@ -237,20 +307,20 @@ fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
     let expr = file_to_expr(in_name)?;
 
     let env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone(), Mode::NonInter)?;
+    let instrs = compile_to_instr(&expr, 2, env.clone())?;
     let result = instrs_to_string(&instrs)?;
 
     Ok(format!("\nsection .text\nglobal our_code_starts_here\nour_code_starts_here:\n  {}\n  ret\n", result))
 }
 
-fn eval_mode_file(in_name: &str) -> std::io::Result<()> {
+fn eval_mode(in_name: &str) -> std::io::Result<()> {
     let expr = file_to_expr(in_name)?;
 
     let mut ops = dynasmrt::x64::Assembler::new().unwrap();
     let start = ops.offset();
 
     let env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone(), Mode::NonInter)?;
+    let instrs = compile_to_instr(&expr, 2, env.clone())?;
     instr_to_dynasm(&mut ops, &instrs)?;
     dynasm!(ops ; .arch x64 ; ret);
     
@@ -261,27 +331,67 @@ fn eval_mode_file(in_name: &str) -> std::io::Result<()> {
     Ok(())
 }
 
-// This is the combination of the logic similar to file_to_expr and eval_mode_file
-fn eval_mode_command(command: &str) -> std::io::Result<()> {
-    let sexp = parse(&command).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Sexp parse error: {}", e)))?;
-    let expr = parse_expr(&sexp)?;
-
+fn repl_mode() -> std::io::Result<()> {
+    // We can reuse this ops later, so we do not compile it every time as new
     let mut ops = dynasmrt::x64::Assembler::new().unwrap();
     let start = ops.offset();
 
-    let env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone(), Mode::Repl)?;
-    instr_to_dynasm(&mut ops, &instrs)?;
-    dynasm!(ops ; .arch x64 ; ret);
-    
-    ops.commit().unwrap();
-    let reader = ops.reader();
-    let buf = reader.lock();
-    let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
-    let result = jitted_fn();
-    println!("{}", result);
+    let mut reader = io::stdin().lock();
+    println!("Press ^D, exit or quit to exit the REPL interative mode.");
 
-    Ok(())
+    // We are going to use this in mutiple loop iterations, so it shouldn't 
+    // be destructed
+    let mut define_env = HashMap::new();
+
+    loop {
+        print!("> ");
+        io::stdout().flush()?;
+
+        let mut buffer = String::new();
+        match reader.read_line(&mut buffer) {
+            Ok(0) => {
+                // The Ctr-D (^D) wouldn;t create a new line, because the escape character is not 
+                // printed, so it would appear as if my farewell message is with the > delimeter
+                // without the newline character at the begining of the message below.
+                println!("\nThanks for you business with us!");
+                break Ok(());
+            },
+            Ok(_) => {
+                let input = buffer.trim();
+
+                if input.is_empty() {
+                    continue;
+                }
+
+                let command = input.to_lowercase();
+                if command == "exit" || command == "quit" {
+                    println!("Thanks for you business with us!");
+                    break Ok(());
+                }
+
+                let sexp = parse(&command).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("Sexp parse error: {}", e)))?;
+                let expr = parse_repl_expr(&sexp)?;
+
+                let env = HashMap::new();
+                let instrs = compile_repl_to_instr(&expr, 2, env.clone(), &mut define_env, &mut ops)?;
+
+                instr_to_dynasm(&mut ops, &instrs)?;
+                dynasm!(ops ; .arch x64 ; ret);
+
+                ops.commit().unwrap();
+                let reader = ops.reader();
+                let buf = reader.lock();
+                let jitted_fn: extern "C" fn() -> i64 = unsafe { mem::transmute(buf.ptr(start)) };
+                let result = jitted_fn();
+                println!("{}", result);
+            },
+            Err(e) => {
+                eprintln!("Error reading input {}", e);
+                break Ok(());
+
+            }
+        }
+    }
 }
 
 
@@ -318,7 +428,7 @@ fn main() -> std::io::Result<()> {
 
             let in_name = &args[2];
 
-            eval_mode_file(in_name)?;
+            eval_mode(in_name)?;
         },
         "-g" => {
             if args.len() < 4 {
@@ -329,51 +439,13 @@ fn main() -> std::io::Result<()> {
             let out_name = &args[3];
 
             let asm_program = generate_string_mode(in_name)?;
-            eval_mode_file(in_name)?;
+            eval_mode(in_name)?;
 
             let mut out_file = File::create(out_name)?;
             out_file.write_all(asm_program.as_bytes())?;
         },
         "-i" => {
-            let mut reader = io::stdin().lock();
-            println!("Press ^D, exit or quit to exit the REPL interative mode.");
-
-            loop {
-                print!("> ");
-                io::stdout().flush()?;
-
-                let mut buffer = String::new();
-                match reader.read_line(&mut buffer) {
-                    Ok(0) => {
-                        // The Ctr-D (^D) wouldn;t create a new line, because the escape character is not 
-                        // printed, so it would appear as if my farewell message is with the > delimeter
-                        // without the newline character at the begining of the message below.
-                        println!("\nThanks for you business with us!");
-                        break;
-                    },
-                    Ok(_) => {
-                        let input = buffer.trim();
-
-                        if input.is_empty() {
-                            continue;
-                        }
-
-                        let command = input.to_lowercase();
-                        if command == "exit" || command == "quit" {
-                            println!("Thanks for you business with us!");
-                            break;
-                        }
-
-                        eval_mode_command(input)?;
-                    },
-                    Err(e) => {
-                        eprintln!("Error reading input {}", e);
-                        break;
-
-                    }
-                }
-            }
-
+            repl_mode()?;
         },
         _    => {
             eprintln!("Unknown flag: {}", flag);
