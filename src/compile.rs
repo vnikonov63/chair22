@@ -94,6 +94,10 @@ pub fn compile_repl_to_instr(
 ) -> std::io::Result<Vec<Instr>> {
     match e {
         ReplExpr::Define(v, e) => {
+            if define_env.contains_key(v) {
+                return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
+            }
+            
             let env = HashMap::new();
             let e_instr = compile_to_instr(e, si, env, define_env.clone())?;
 

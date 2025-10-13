@@ -88,11 +88,30 @@ pub fn repl_mode() -> std::io::Result<()> {
                     break Ok(());
                 }
 
-                let sexp = parse(&command).map_err(|_e| std::io::Error::new(std::io::ErrorKind::Other, "Invalid: parse error".to_string()))?;
-                let expr = parse_repl_expr(&sexp)?;
+                let sexp = match parse(&command) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        println!("Invalid: parse error");
+                        continue;
+                    }
+                };
+
+                let expr = match parse_repl_expr(&sexp) {
+                    Ok(e) => e,
+                    Err(_) => {
+                        println!("Invalid: parse error");
+                        continue;
+                    }
+                };
 
                 let start = ops.offset();
-                let instrs = compile_repl_to_instr(&expr, 2, &mut define_env, &mut ops)?;
+                let instrs = match compile_repl_to_instr(&expr, 2, &mut define_env, &mut ops) {
+                    Ok(i) => i,
+                    Err(err) => {
+                        println!("{}", err);
+                        continue;
+                    }
+                };
 
                 // We do not want to print for define
                 if instrs.is_empty() {
