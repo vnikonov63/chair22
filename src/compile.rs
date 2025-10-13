@@ -32,7 +32,7 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, define_env
                 if level.contains(v) {
                     return Err(std::io::Error::new(std::io::ErrorKind::Other, "Duplicate binding"));
                 }
-                let e_instr = compile_to_instr(e, si, curr_env.clone(), define_env.clone())?;
+                let e_instr = compile_to_instr(e, curr_si, curr_env.clone(), define_env.clone())?;
                 result_instr.extend(e_instr);
                 result_instr.push(Instr::MovToStack(Reg::Rax, curr_si * 8));
 
