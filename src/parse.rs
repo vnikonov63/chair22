@@ -20,10 +20,10 @@ pub fn parse_expr(s: &Sexp) -> std::io::Result<Expr> {
                                         let pair = (name.clone(), parsed);
                                         bs.push(pair);
                                     }
-                                    _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error in Let Binding")),
+                                    _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid: parse error")),
                                 }
                             }
-                            _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error in Let Binding")),
+                            _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid: parse error")),
                         }
                     }
                     Ok(Expr::Let(bs, Box::new(parse_expr(body)?)))
@@ -35,10 +35,10 @@ pub fn parse_expr(s: &Sexp) -> std::io::Result<Expr> {
                 [Sexp::Atom(S(op)), e1, e2] if op == "-" => Ok(Expr::BinOp(Op2::Minus, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
                 [Sexp::Atom(S(op)), e1, e2] if op == "*" => Ok(Expr::BinOp(Op2::Times, Box::new(parse_expr(e1)?), Box::new(parse_expr(e2)?))),
 
-                _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error")),
+                _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid: parse error")),
             }
         },
-        _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Parse Error")),
+        _ => return Err(std::io::Error::new(std::io::ErrorKind::Other, "Invalid: parse error")),
     }
 }
 
