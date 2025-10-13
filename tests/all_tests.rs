@@ -13,11 +13,12 @@ success_tests! {
     _10_later_binding_available_let: "10",
     _11_nested_let: "11",
     _12_triple_nested_let: "12",
+    _13_complex_let: "13",
 }
 
 failure_tests! {
-    _13_unbound_id: "Unbound variable identifier x",
-    _14_duplicate: "Duplicate binding",
+    _14_unbound_id: "Unbound variable identifier x",
+    _15_duplicate: "Duplicate binding",
 }
 
 repl_tests! {
