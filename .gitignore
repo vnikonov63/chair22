@@ -1,7 +1,6 @@
-boa/target/                 
 **/target/
-boa/runtime/*.o             
-boa/runtime/*.a
+boa-cli/runtime/*.o             
+boa-cli/runtime/*.a
 
 # ---- VS Code ----
 .vscode/
