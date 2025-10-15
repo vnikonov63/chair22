@@ -1,7 +1,7 @@
-/target/                 
+boa/target/                 
 **/target/
-/runtime/*.o             
-/runtime/*.a
+boa/runtime/*.o             
+boa/runtime/*.a
 
 # ---- VS Code ----
 .vscode/
@@ -15,7 +15,7 @@
 *.swp
 
 # ---- My Simple Stuff
-.cargo
-test/
-tests/*.s
-tests/*.run
+boa/.cargo
+boa/test/
+boa/tests/*.s
+boa/tests/*.run
