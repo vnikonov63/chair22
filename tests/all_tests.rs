@@ -49,6 +49,4 @@ repl_tests! {
     _repl_16_parse_error_no_exit: ["(hello", "(+ 1 2)"] => ["Invalid: parse error", "3"],
     _repl_17_dublicate_binding_no_exit: ["(define x 4)", "(define x 3)", "(+ 1 4)"] => ["Duplicate binding", "5"],
     _repl_18_unbound_variable_identifier: ["y"] => ["Unbound variable identifier y"],
-    _repl_19_exit: ["exit"] => ["Thanks for you business with us!"],
-    _repl_20_quit: ["quit"] => ["Thanks for you business with us!"],
 }

@@ -26,7 +26,7 @@ pub fn generate_string_mode(in_name: &str) -> std::io::Result<String> {
 
     let env = HashMap::new();
     let empty_define_env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone(), empty_define_env.clone())?;
+    let instrs = compile_to_instr(&expr, 2, env.clone(), &empty_define_env)?;
     let result = instrs_to_string(&instrs)?;
 
     Ok(format!("\nsection .text\nglobal our_code_starts_here\nour_code_starts_here:\n  {}\n  ret\n", result))
@@ -40,7 +40,7 @@ pub fn eval_mode(in_name: &str) -> std::io::Result<()> {
 
     let env = HashMap::new();
     let empty_define_env = HashMap::new();
-    let instrs = compile_to_instr(&expr, 2, env.clone(), empty_define_env.clone())?;
+    let instrs = compile_to_instr(&expr, 2, env.clone(), &empty_define_env)?;
     instr_to_dynasm(&mut ops, &instrs)?;
     dynasm!(ops ; .arch x64 ; ret);
     
