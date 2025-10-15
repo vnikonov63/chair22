@@ -1,8 +1,2 @@
-# Build for x86_64 macOS so the JIT-generated x86_64 machine code (dynasm .arch x64)
-# can be executed correctly on Apple Silicon machines running under Rosetta.
-# Alternatives:
-# - Run the build under Rosetta without changing Cargo config: `arch -x86_64 cargo run -p boa-cli`
-# - Remove this file to restore the default (native) target build.
-
 [build]
 target = "x86_64-apple-darwin"

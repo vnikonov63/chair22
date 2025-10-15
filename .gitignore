@@ -1,7 +1,4 @@
-# ---- Rust workspace ignores ----
-**/target/
-boa-cli/runtime/*.o             
-boa-cli/runtime/*.a
+target/
 
 # VS Code / macOS / Temp
 .vscode/
@@ -11,12 +8,10 @@ boa-cli/runtime/*.a
 *.swp
 
 # Project-specific
-boa/.cargo
-boa/test/
 boa/tests/*.s
 boa/tests/*.run
 
-# ---- React / Node (client) ignores ----
+# React / Node ignores
 client/node_modules
 client/dist
 client/dist-ssr
