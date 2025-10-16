@@ -1,9 +1,7 @@
+import ReplBox from "./ReplBox/ReplBox";
+
 function App() {
-  return (
-    <>
-      <div>Hello World!</div>
-    </>
-  );
+  return <ReplBox />;
 }
 
 export default App;

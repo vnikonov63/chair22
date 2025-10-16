@@ -40,22 +40,18 @@ macro_rules! repl_tests {
 }
 
 fn compile(name: &str) -> Result<(String, String), String> {
-    // Build the project
     let status = Command::new("cargo")
         .arg("build")
         .status()
         .expect("could not run cargo");
     assert!(status.success(), "could not build the project");
 
-    // Run the compiler
     let boa_path = if cfg!(target_os = "macos") {
         PathBuf::from("target/x86_64-apple-darwin/debug/boa")
     } else {
         PathBuf::from("target/debug/boa")
     };
 
-/*     eprintln!("\n================= COMPILE (-c) =================");
-    eprintln!("Running: {:?} -c {:?} {:?}", boa_path, mk_path(name, Ext::Snek), mk_path(name, Ext::Asm)); */
     let output_c = Command::new(&boa_path)
         .arg("-c")
         .arg(&mk_path(name, Ext::Snek))
@@ -65,13 +61,6 @@ fn compile(name: &str) -> Result<(String, String), String> {
     if !output_c.status.success() {
         return Err(String::from_utf8(output_c.stderr).unwrap());
     }
-/*     eprintln!("Exit status: {}", output_c.status);
-    eprintln!("--- STDOUT ---\n{}", String::from_utf8_lossy(&output_c.stdout));
-    eprintln!("--- STDERR ---\n{}", String::from_utf8_lossy(&output_c.stderr));
-    eprintln!("================================================\n"); */
-
-/*     eprintln!("\n================= COMPILE (-e) =================");
-    eprintln!("Running: {:?} -e {:?} {:?}", boa_path, mk_path(name, Ext::Snek), mk_path(name, Ext::Asm)); */
     let output_e = Command::new(&boa_path)
         .arg("-e")
         .arg(&mk_path(name, Ext::Snek))
@@ -80,10 +69,6 @@ fn compile(name: &str) -> Result<(String, String), String> {
     if !output_e.status.success() {
         return Err(String::from_utf8(output_e.stderr).unwrap());
     }
-/*     eprintln!("Exit status: {}", output_c.status);
-    eprintln!("--- STDOUT ---\n{}", String::from_utf8_lossy(&output_c.stdout));
-    eprintln!("--- STDERR ---\n{}", String::from_utf8_lossy(&output_c.stderr));
-    eprintln!("================================================\n"); */
 
     let jit_stdout = String::from_utf8(output_e.stdout).unwrap();
 

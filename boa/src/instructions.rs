@@ -43,8 +43,6 @@ pub fn instrs_to_string(instrs: &Vec<Instr>) -> std::io::Result<String> {
     .join("\n"))
 }
 
-// TODO: Ask what is happening here in case in the future I decide to add more registers, dynsasm
-// does not just take the strings, and we might need to use something different, right?
 pub fn instr_to_dynasm(ops : &mut dynasmrt::x64::Assembler, instrs: &Vec<Instr>) -> std::io::Result<()> {
     for instr in instrs {
         match instr {

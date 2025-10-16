@@ -9,5 +9,6 @@ boa = { path = "../boa" }
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 tower-http = { version = "0.5", features = ["cors"] }
+serde_json = "1"
+
