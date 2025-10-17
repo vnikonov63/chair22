@@ -4,7 +4,7 @@ use axum::{extract::{Json, State}, http::{header::CONTENT_TYPE, Method}, routing
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
-use boa::Repl;
+use viva::Repl;
 
 #[derive(Deserialize)]
 struct Input {
@@ -22,6 +22,9 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    #[cfg(debug_assertions)]
+    let _ = dotenvy::dotenv();
+
     let state = Arc::new(AppState {
         repl: Mutex::new(Repl::new()),
     });
@@ -36,8 +39,13 @@ async fn main() {
         .with_state(state)
         .layer(cors);
 
-    let port: u16 = env::var("PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(8080);
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let default_host = if cfg!(debug_assertions) { "127.0.0.1" } else { "0.0.0.0" };
+    let host = env::var("HOST").unwrap_or_else(|_| default_host.into());
+    let port: u16 = env::var("PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(3000);
+    let addr: SocketAddr = format!("{host}:{port}")
+        .parse()
+        .expect("Invalid HOST/PORT");
+
     println!("Server running on http://{addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

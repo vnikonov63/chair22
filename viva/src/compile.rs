@@ -12,8 +12,6 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, define_env
         Expr::Number(n) => Ok(vec![Instr::Mov(Reg::Rax, *n)]),
         Expr::Id(s) => {
             match env.get(s) {
-                // the multiplication coerces/dereferences the &i32 here, but in the case
-                // of compile_reple_to_instr I need to dereference it!
                 Some(offset) => Ok(vec![Instr::MovFromStack(Reg::Rax, offset * 8)]),
                 None => match define_env.get(s) {
                     Some(value) => Ok(vec![Instr::Mov(Reg::Rax, *value)]),
@@ -85,7 +83,6 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, define_env
     }
 }
 
-// I understand this is not really the compile thing, but in my head this is on the same level as compile_to_instr
 pub fn compile_repl_to_instr(
     e: &ReplExpr, si: i32, 
     define_env: &mut HashMap<String, i32>, 
@@ -100,7 +97,6 @@ pub fn compile_repl_to_instr(
             let env = HashMap::new();
             let e_instr = compile_to_instr(e, si, env, define_env)?;
 
-            /* the running logic */
             let start = ops.offset();
             instr_to_dynasm(ops, &e_instr)?;
             dynasm!(ops ; .arch x64 ; ret);

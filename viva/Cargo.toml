@@ -1,17 +1,18 @@
 [package]
-name = "boa"
+name = "viva"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75.0"
 
 [lib]
-name = "boa"
+name = "viva"
 path = "src/lib.rs"
 
 [dependencies]
 sexp = "1.1.4"
 dynasm = "2.0.0"
 dynasmrt = "2.0.0"
+ariadne = { version = "0.5", features = ["auto-color"] }
 
 [dev-dependencies]
 prettydiff = "0.6.4"
