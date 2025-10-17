@@ -69,9 +69,9 @@ pub fn compile_to_instr(e: &Expr, si: i32, env: HashMap<String, i32>, define_env
                 }
                 Op2::Minus => {
                     result_instr.extend(e2_instr);
-                    result_instr.push(Instr::MovToStack(Reg::Rax, stack_offset));
+                    result_instr.push(Instr::MovToStack(Reg::Rax, stack_offset + 8));
                     result_instr.extend(e1_instr);
-                    result_instr.push(Instr::SubRaxMemFromStack(stack_offset));
+                    result_instr.push(Instr::SubRaxMemFromStack(stack_offset + 8));
                 }
                 Op2::Times => {
                     result_instr.extend(e1_instr);
