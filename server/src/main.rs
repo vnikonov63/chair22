@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::{Arc, Mutex}};
+use std::{net::SocketAddr, sync::{Arc, Mutex}, env};
 
 use axum::{extract::{Json, State}, http::{header::CONTENT_TYPE, Method}, routing::post, Router};
 use serde::{Deserialize, Serialize};
@@ -36,8 +36,9 @@ async fn main() {
         .with_state(state)
         .layer(cors);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8080));
-    println!("Server running on http://{}", addr);
+    let port: u16 = env::var("PORT").ok().and_then(|s| s.parse().ok()).unwrap_or(8080);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    println!("Server running on http://{addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

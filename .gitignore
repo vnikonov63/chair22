@@ -33,3 +33,6 @@ client/*.ntvs*
 client/*.njsproj
 client/*.sln
 client/*.sw?
+
+# ENVIRONMENT VARIABLES
+*/.env*

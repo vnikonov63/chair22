@@ -22,7 +22,8 @@ export default function App() {
     if (!cell) return;
 
     try {
-      const res = await fetch("http://127.0.0.1:8080/eval", {
+      const API = import.meta.env.VITE_API_BASE;
+      const res = await fetch(`${API}/eval`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: cell.input }),
