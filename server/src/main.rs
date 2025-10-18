@@ -104,12 +104,5 @@ async fn create_repl_handler (State(state): State<Arc<AppState>>) -> Json<NewRep
         let mut map = state.repls.write().await;
         map.insert(id, Arc::new(Mutex::new(Repl::new())));
     }
-    // debug: print current repl ids
-    {
-        let map = state.repls.read().await;
-        let keys: Vec<String> = map.keys().map(|k| k.to_string()).collect();
-        eprintln!("current repl ids after insert: {:?}", keys);
-    }
-
     Json(NewRepl { id })
 }
