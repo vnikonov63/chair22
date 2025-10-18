@@ -9,7 +9,7 @@ import {
   Flex,
 } from "@chakra-ui/react";
 
-export default function App() {
+export default function App({ replId }: { replId: number | null }) {
   type Cell = {
     id: number;
     input: string;
@@ -47,10 +47,11 @@ export default function App() {
   const runCell = async (index: number) => {
     const cell = cells[index];
     if (!cell) return;
+    if (replId === null) return;
 
     try {
       const API = import.meta.env.VITE_API_BASE;
-      const res = await fetch(`${API}/eval`, {
+      const res = await fetch(`${API}/eval/${replId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: cell.input }),
@@ -118,6 +119,7 @@ export default function App() {
                   size="sm"
                   onClick={() => runCell(idx)}
                   minW="80px"
+                  disabled={replId === null}
                 >
                   Run
                 </Button>
