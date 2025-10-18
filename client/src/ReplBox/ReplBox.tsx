@@ -63,7 +63,9 @@ export default function App({ replId }: { replId: number | null }) {
         resultText = `Server error: ${res.status} ${text}`;
       } else {
         const data = await res.json();
-        resultText = data.result ?? "";
+        const base = data.result ?? "";
+        const dur = data.duration ? ` (${data.duration})` : "";
+        resultText = `${base} | Finished in ${dur} ms`;
       }
 
       setCells((prev) => {

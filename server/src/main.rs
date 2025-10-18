@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
+    time::{Instant, Duration},
     env,
     net::SocketAddr, 
     sync::{
         Arc, 
         atomic::{AtomicU64, Ordering}
-    },
+    }
 };
 
 use axum::{
@@ -28,7 +29,8 @@ struct Input {
 
 #[derive(Serialize)]
 struct Output {
-    result: String
+    result: String,
+    duration: String
 }
 
 #[derive(Serialize, Deserialize)]
@@ -84,18 +86,24 @@ async fn eval_handler(
         map.get(&id).cloned()
     };
 
-    let result_str = if let Some(repl_mutex) = possible_repl {
+    let (result_str, elapsed) = if let Some(repl_mutex) = possible_repl {
         let mut repl = repl_mutex.lock().await;
-        match repl.feed(&input.text) {
+        let start = Instant::now();
+        let res = match repl.feed(&input.text) {
             Ok(Some(s)) => s,
             Ok(None) => String::new(),
             Err(e) => format!("Error: {}", e),
-        }
+        };
+        let elapsed: Duration = start.elapsed();
+        (res, elapsed)
     } else {
-        format!("Error: repl with id: {} is not found", id)
+        (format!("Error: repl with id: {} is not found", id), Duration::from_secs(0))
     };
 
-    Json(Output { result: result_str })
+    Json(Output {
+        result: result_str,
+        duration: elapsed.as_millis().to_string(),
+    })
 }
 
 async fn create_repl_handler (State(state): State<Arc<AppState>>) -> Json<NewRepl> {
