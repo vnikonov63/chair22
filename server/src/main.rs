@@ -1,23 +1,43 @@
-use std::{net::SocketAddr, sync::{Arc, Mutex}, env};
+use std::{
+    collections::HashMap,
+    env,
+    net::SocketAddr, 
+    sync::{
+        Arc, 
+        atomic::{AtomicU64, Ordering}
+    },
+};
 
-use axum::{extract::{Json, State}, http::{header::CONTENT_TYPE, Method}, routing::post, Router};
+use axum::{
+    extract::{Json, Path, State}, 
+    http::{header::CONTENT_TYPE, Method}, 
+    routing::post, 
+    Router
+};
+
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
+use tokio::sync::{Mutex, RwLock};
 
 use viva::Repl;
 
 #[derive(Deserialize)]
 struct Input {
-    text: String,
+    text: String
 }
 
 #[derive(Serialize)]
 struct Output {
-    result: String,
+    result: String
 }
 
+#[derive(Deserialize)]
+struct NewRepl {
+    id: u64
+}
 struct AppState {
-    repl: Mutex<Repl>
+    repls: RwLock<HashMap<u64, Arc<Mutex<Repl>>>>,
+    next_id: AtomicU64
 }
 
 #[tokio::main]
@@ -26,7 +46,8 @@ async fn main() {
     let _ = dotenvy::dotenv();
 
     let state = Arc::new(AppState {
-        repl: Mutex::new(Repl::new()),
+        next_id: AtomicU64::new(1),
+        repls: RwLock::new(HashMap::new())
     });
 
     let cors = CorsLayer::new()
@@ -35,7 +56,8 @@ async fn main() {
         .allow_headers([CONTENT_TYPE]);
 
     let app = Router::new()
-        .route("/eval", post(eval_handler))
+        .route("/repl", post(create_repl_handler))
+        .route("/eval/:id", post(eval_handler))
         .with_state(state)
         .layer(cors);
 
@@ -54,14 +76,33 @@ async fn main() {
 
 async fn eval_handler(
     State(state): State<Arc<AppState>>,
+    Path(id): Path<u64>,
     Json(input): Json<Input>,
 ) -> Json<Output> {
-    let mut repl = state.repl.lock().unwrap();
-    let result_str = match repl.feed(&input.text) {
-        Ok(Some(s)) => s,
-        Ok(None) => String::new(),
-        Err(e) => format!("Error: {}", e),
+    let possible_repl = {
+        let map = state.repls.read().await;
+        map.get(&id).cloned()
+    };
+
+    let result_str = if let Some(repl_mutex) = possible_repl {
+        let mut repl = repl_mutex.lock().await;
+        match repl.feed(&input.text) {
+            Ok(Some(s)) => s,
+            Ok(None) => String::new(),
+            Err(e) => format!("Error: {}", e),
+        }
+    } else {
+        format!("Error: repl with id: {} is not found", id)
     };
 
     Json(Output { result: result_str })
+}
+
+async fn create_repl_handler (State(state): State<Arc<AppState>>) -> Json<NewRepl> {
+    let id = state.next_id.fetch_add(1, Ordering::Relaxed);
+    {
+        let mut map = state.repls.write().await;
+        map.insert(id, Arc::new(Mutex::new(Repl::new())));
+    }
+    Json(NewRepl { id })
 }
