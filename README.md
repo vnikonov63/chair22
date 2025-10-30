@@ -35,4 +35,36 @@ This is the concrete syntax for the input language of my compiler:
 <binding> := (<identifier> <expr>)
 ```
 
+## Code You Can Run
+**1. First Fibonacci Sequence Element with a Given Divisor**
+```Racket
+(let ((divisor 25) (index 0) (maximum 50) (prev 0) (curr 1) (temp1 0) (temp2 0))
+    (if (<= divisor 0)
+        -1
+        (loop
+            (if (<= index maximum)
+                (block
+                    (set! temp1 curr)
+                    (loop
+                        (if (> temp1 0)
+                            (set! temp1 (- temp1 divisor))
+                            (break temp1)
+                        )
+                    )
+                    (if (= temp1 0)
+                        (break curr)
+                        (block
+                            (set! temp2 curr)
+                            (set! curr (+ curr prev))
+                            (set! prev temp2)
+                            (set! index (add1 index))
+                        )
+                    )
+                )
+                (break -1)
+            )
+        )
+    )
+)
+```
 
