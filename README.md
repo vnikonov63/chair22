@@ -14,6 +14,8 @@ You can try out my demo on this [website](https://chair22-web.onrender.com/)
 
 This is the concrete syntax for the input language of my compiler:
 ```
+<prog> := <defn>* <expr>                
+<defn> := (fun (<name> <name>*) <expr>) 
 <expr> :=
   | <number>
   | true
@@ -28,8 +30,9 @@ This is the concrete syntax for the input language of my compiler:
   | (block <expr>+)
   | (loop <expr>)
   | (break <expr>)
+  | (<name> <expr>*)                    
 
-<op1> := add1 | sub1 | isnum | isbool
+<op1> := add1 | sub1 | isnum | isbool | print 
 <op2> := + | - | * | < | > | >= | <= | =
 
 <binding> := (<identifier> <expr>)
