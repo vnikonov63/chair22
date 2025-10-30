@@ -5,7 +5,11 @@ You can try out my demo on this [website](https://chair22-web.onrender.com/)
 ## Quick Start
 - You can start the server with `cargo run -p server`
 - You can start the frontend with `cd client && npm run`
-- You can interact with the compiler in the command line with `cargo run -p cli`
+- You can interact with the compiler in the command line with
+    - `cargo run -p cli -- -c <input.snek> <output.s> # To generate an assembly file for a given file`
+    - `cargo run -p cli -- -e <input.snek> <optionalArg> # To evaluate a given file`
+    - `cargo run -p cli -- -g <input.snek> <output.s> <optionalArg> # Combines he use of both modes above`
+    - `cargo run -p cli -- -i # To enter the repl mode`
 - You can run the tests for the compiler with `cd cli && cargo test`
 
 ## Features 
