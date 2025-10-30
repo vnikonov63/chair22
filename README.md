@@ -74,4 +74,40 @@ This is the concrete syntax for the input language of my compiler:
     )
 )
 ```
-
+**2. Determine whether the given number is perfect**
+```Racket
+(let ((num 33550336) (curr_sum 1) (curr_index 2) (temp 0) (counter 0))
+    (if (<= num 1)
+        false
+        (loop
+            (if (<= (* curr_index curr_index) num)
+                (block
+                    (set! temp num)
+                    (set! counter 0)
+                    (loop
+                        (if (> temp 0)
+                            (block
+                                (set! temp (- temp curr_index))
+                                (set! counter (add1 counter))
+                            )
+                            (break temp)
+                        )
+                    )
+                    (if (= temp 0)
+                        (block
+                            (set! curr_sum (+ curr_sum curr_index))
+                            (if (= curr_index counter)
+                                (set! curr_sum curr_sum)
+                                (set! curr_sum (+ curr_sum counter))
+                            )
+                            (set! curr_index (add1 curr_index))
+                        )
+                        (set! curr_index (add1 curr_index))
+                    )
+                )
+                (break (if (= curr_sum num) true false))
+            )
+        )
+    )
+)
+```
