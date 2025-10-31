@@ -2,24 +2,28 @@ You can view, follow and analyze my work for this and [chair23](https://github.c
 
 You can try out my demo on this [website](https://chair22-web.onrender.com/)
 
+![Demo](./recordings/demo1.gif)
+
 ## Quick Start
+
 - You can start the server with `cargo run -p server`
 - You can start the frontend with `cd client && npm run`
 - You can interact with the compiler in the command line with
-    - `cargo run -p cli -- -c <input.viva> <output.s> # To generate an assembly file for a given file`
-    - `cargo run -p cli -- -e <input.viva> <optionalArg> # To evaluate a given file`
-    - `cargo run -p cli -- -g <input.viva> <output.s> <optionalArg> # Combines he use of both modes above`
-    - `cargo run -p cli -- -i # To enter the repl mode`
+  - `cargo run -p cli -- -c <input.viva> <output.s> # To generate an assembly file for a given file`
+  - `cargo run -p cli -- -e <input.viva> <optionalArg> # To evaluate a given file`
+  - `cargo run -p cli -- -g <input.viva> <output.s> <optionalArg> # Combines he use of both modes above`
+  - `cargo run -p cli -- -i # To enter the repl mode`
 - You can run the tests for the compiler with `cd cli && cargo test`
 
-## Features 
+## Features
 
 ## Concrete Syntax
 
 This is the concrete syntax for the input language of my compiler:
+
 ```
-<prog> := <defn>* <expr>                
-<defn> := (fun (<name> <name>*) <expr>) 
+<prog> := <defn>* <expr>
+<defn> := (fun (<name> <name>*) <expr>)
 <expr> :=
   | <number>
   | true
@@ -34,16 +38,18 @@ This is the concrete syntax for the input language of my compiler:
   | (block <expr>+)
   | (loop <expr>)
   | (break <expr>)
-  | (<name> <expr>*)                    
+  | (<name> <expr>*)
 
-<op1> := add1 | sub1 | isnum | isbool | print 
+<op1> := add1 | sub1 | isnum | isbool | print
 <op2> := + | - | * | < | > | >= | <= | =
 
 <binding> := (<identifier> <expr>)
 ```
 
 ## Code You Can Run
+
 **1. First Fibonacci Sequence Element with a Given Divisor**
+
 ```Racket
 (let ((divisor 25) (index 0) (maximum 50) (prev 0) (curr 1) (temp1 0) (temp2 0))
     (if (<= divisor 0)
@@ -74,7 +80,9 @@ This is the concrete syntax for the input language of my compiler:
     )
 )
 ```
+
 **2. Determine whether the given number is perfect**
+
 ```Racket
 (let ((num 33550336) (curr_sum 1) (curr_index 2) (temp 0) (counter 0))
     (if (<= num 1)
