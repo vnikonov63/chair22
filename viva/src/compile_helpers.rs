@@ -128,8 +128,8 @@ pub fn overflow_handler() -> Vec<Instr> {
     result
 }
 
-fn recursively_collet_set_identifiers(curre: &Expr, result: &mut HashSet<String>) {
-    match curre {
+fn recursively_collet_set_identifiers(current: &Expr, result: &mut HashSet<String>) {
+    match current {
         Expr::Number(_) => {},
         Expr::Boolean(_) => {},
         Expr::Id(_) => {},
@@ -166,6 +166,11 @@ fn recursively_collet_set_identifiers(curre: &Expr, result: &mut HashSet<String>
             result.insert(name.clone());
             recursively_collet_set_identifiers(e, result);
         }
+        Expr::Call(_, args) => {
+            for arg in args {
+                recursively_collet_set_identifiers(arg, result);
+            }
+        }
     }
 }
 
@@ -188,4 +193,17 @@ pub fn allocate_define_ptrs_for_set_targets(
         }
     }
     result
+}
+
+pub fn recursively_collet_depth(current: &Expr) -> i32 {
+    match current {
+        Expr::Number(_) | Expr::Boolean(_) | Expr::Id(_) => 0,
+        Expr::Let(bindings, body) => bindings.iter().enumerate().map(|(i, (_, e))| i as i32 + recursively_collet_depth(e)).max().unwrap_or(0).max(recursively_collet_depth(body) + bindings.len() as i32),
+        Expr::UnOp(_, e) => recursively_collet_depth(e),
+        Expr::BinOp(_, e1, e2) => 1 + recursively_collet_depth(e1).max(recursively_collet_depth(e2)),
+        Expr::If(c, t, f) => recursively_collet_depth(c).max(recursively_collet_depth(t)).max(recursively_collet_depth(f)),
+        Expr::Loop(e) | Expr::Break(e) | Expr::Set(_, e) => recursively_collet_depth(e),
+        Expr::Block(es) => es.iter().map(|e| recursively_collet_depth(e)).max().unwrap_or(0),
+        Expr::Call(_, args) => 1 + args.len() as i32 + args.iter().map(|a| recursively_collet_depth(a)).max().unwrap_or(0)
+    }
 }
