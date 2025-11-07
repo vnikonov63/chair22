@@ -22,8 +22,11 @@ You can try out my demo on this [website](https://chair22-web.onrender.com/)
 This is the concrete syntax for the input language of my compiler:
 
 ```
+<type> := Num | Bool | Nothing | Any
 <prog> := <defn>* <expr>
-<defn> := (fun (<name> <name>*) <expr>)
+<defn> := (fun (<name> (<name> : <type>)*) -> <type> <expr>)
+  | (fun (<name> <name>*) <expr>)
+<binding> := (<identifier> <expr>)
 <expr> :=
   | <number>
   | true
@@ -39,11 +42,22 @@ This is the concrete syntax for the input language of my compiler:
   | (loop <expr>)
   | (break <expr>)
   | (<name> <expr>*)
+  | (cast <type> <expr>)
 
 <op1> := add1 | sub1 | isnum | isbool | print
 <op2> := + | - | * | < | > | >= | <= | =
+```
 
-<binding> := (<identifier> <expr>)
+## Calling Convention for the Viva is different from System V AMD64 ABI
+
+## Type System is Organized as a Small Lattice
+
+```
+    Any
+   /   \
+ Num   Bool
+   \   /
+  Nothing
 ```
 
 ## Code You Can Run
