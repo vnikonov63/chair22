@@ -49,10 +49,49 @@ This is the concrete syntax for the input language of my compiler:
 ```
 
 ## Calling Convention for the Viva is different from System V AMD64 ABI
+Consider the code:
+```Racket
+(fun (f1 a b c)
+  (a * b + c))
+
+(fun (f2 a b)
+  (= (f1 a 4 b) (f1 b 4 a)))
+
+; main
+(block
+  (let (dummy1 1) (dummy2 2) (dummy3 3)) 
+  (f2 2 3)
+)
+```
+Internally what happens is:
+```text
+LOW ADDRESS
+                ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+                ┃                              [ IN f1 ]                               ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃  a = 3                                                               ┃
+                ┃  b = 4                                                               ┃
+                ┃  c = 2                                                               ┃
+                ┃  after_call_f1_2   ← callee returns with jmp [rsp]                   ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃                              [ IN f2 ]                               ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃  b = 3                                                               ┃
+                ┃  a = 2                                                               ┃
+                ┃  after_call_f2     ← return target for both f1 calls                 ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃                              [ IN MAIN ]                             ┃
+                ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+                ┃  dummy3                                                              ┃
+                ┃  dummy2                                                              ┃
+                ┃  dummy1                                                              ┃
+                ┃  ret_to_runtime   (our_code_starts_here return)                      ┃
+                ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+HIGH ADDRESS
+```
 
 ## Type System is Organized as a Small Lattice
-
-```
+```text
     Any
    /   \
  Num   Bool
@@ -62,7 +101,7 @@ This is the concrete syntax for the input language of my compiler:
 
 ## Code You Can Run
 
-**1. First Fibonacci Sequence Element with a Given Divisor**
+**9. First Fibonacci Sequence Element with a Given Divisor**
 
 ```Racket
 (let ((divisor 25) (index 0) (maximum 50) (prev 0) (curr 1) (temp1 0) (temp2 0))
@@ -95,7 +134,7 @@ This is the concrete syntax for the input language of my compiler:
 )
 ```
 
-**2. Determine whether the given number is perfect**
+**10. Determine whether the given number is perfect**
 
 ```Racket
 (let ((num 33550336) (curr_sum 1) (curr_index 2) (temp 0) (counter 0))
